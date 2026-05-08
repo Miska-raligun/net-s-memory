@@ -4,8 +4,10 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     LargeBinary,
@@ -86,6 +88,37 @@ class MerkleLeaf(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )
+
+
+class Analysis(Base):
+    __tablename__ = "analysis"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    news_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("news_item.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    corroboration_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    corroboration_sources: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    reputation_label: Mapped[str] = mapped_column(String(16), nullable=False)
+    reputation_weight: Mapped[float] = mapped_column(Float, nullable=False)
+    llm_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    llm_consistency: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    llm_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    llm_evidence: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    llm_model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+    signer: Mapped[str] = mapped_column(String(64), nullable=False)
+    alg: Mapped[str] = mapped_column(String(32), nullable=False, default="ed25519")
+    pubkey: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False)
+    sig: Mapped[bytes] = mapped_column(LargeBinary(64), nullable=False)
+    canonical_bytes: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
 
 class MerkleAnchor(Base):

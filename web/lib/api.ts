@@ -30,3 +30,20 @@ export interface Transparency {
   root_hash: string | null;
   anchors: Anchor[];
 }
+
+export interface Analysis {
+  id: string;
+  news_id: string;
+  score: number;
+  corroboration_count: number;
+  corroboration_sources: string[];
+  reputation_label: string;
+  reputation_weight: number;
+  llm_score: number | null;
+  llm_consistency: string | null;
+  llm_summary: string | null;
+  llm_model: string | null;
+  generated_at: string;
+  signer: string;
+  alg: string;
+}

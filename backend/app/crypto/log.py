@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crypto.canonical import encode
 from app.crypto.merkle import leaf_hash
-from app.db.models import MerkleLeaf, NewsSignature
+from app.db.models import Analysis, MerkleLeaf, NewsSignature
 
 DOMAIN_TAGS: dict[str, bytes] = {
     "news": b"net-s-memory:news:v1\n",
@@ -66,6 +66,44 @@ async def append_news_signed(
         leaf_hash=h,
         leaf_type="news",
         ref_id=news_id,
+        payload_digest=payload_digest,
+    )
+    session.add(leaf)
+    await session.flush()
+
+    return leaf.seq, h
+
+
+async def append_analysis_signed(
+    session: AsyncSession,
+    analysis: Analysis,
+    payload: dict[str, Any],
+    signer_id: str,
+    signing_key: SigningKey,
+) -> tuple[int, bytes]:
+    """Sign ``payload``, embed sig+canonical on the Analysis row, append a leaf.
+
+    Unlike news (which has its own signature table), analyses are
+    one-per-news so we keep the signature inline. Returns ``(seq, leaf_hash)``.
+    """
+    canonical = encode(payload)
+    sig = signing_key.sign(canonical).signature
+    pubkey = bytes(signing_key.verify_key)
+
+    leaf_bytes = compute_leaf_bytes("analysis", canonical, sig)
+    h = leaf_hash(leaf_bytes)
+    payload_digest = hashlib.sha256(canonical).digest()
+
+    analysis.signer = signer_id
+    analysis.alg = "ed25519"
+    analysis.pubkey = pubkey
+    analysis.sig = sig
+    analysis.canonical_bytes = canonical
+
+    leaf = MerkleLeaf(
+        leaf_hash=h,
+        leaf_type="analysis",
+        ref_id=analysis.id,
         payload_digest=payload_digest,
     )
     session.add(leaf)

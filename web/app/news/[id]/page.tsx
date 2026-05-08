@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { API_BASE, type NewsDetail } from "@/lib/api";
+import { API_BASE, type Analysis, type NewsDetail } from "@/lib/api";
 import { type ProofResponse, type VerificationStatus, verifyProof } from "@/lib/verify";
 
 export default function NewsPage({ params }: { params: { id: string } }) {
@@ -10,6 +10,9 @@ export default function NewsPage({ params }: { params: { id: string } }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [status, setStatus] = useState<VerificationStatus | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,10 +27,38 @@ export default function NewsPage({ params }: { params: { id: string } }) {
       .catch((e: Error) => {
         if (!cancelled) setLoadError(e.message);
       });
+
+    fetch(`${API_BASE}/api/news/${params.id}/analysis`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: Analysis | null) => {
+        if (!cancelled && d) setAnalysis(d);
+      })
+      .catch(() => {
+        /* analysis is optional */
+      });
     return () => {
       cancelled = true;
     };
   }, [params.id]);
+
+  async function onAnalyze() {
+    setAnalyzing(true);
+    setAnalysisError(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/news/${params.id}/analysis`, {
+        method: "POST",
+      });
+      if (!r.ok) {
+        setAnalysisError(`分析失败：${r.status}`);
+        return;
+      }
+      setAnalysis(await r.json());
+    } catch (e) {
+      setAnalysisError((e as Error).message);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   async function onVerify() {
     setVerifying(true);
@@ -80,6 +111,69 @@ export default function NewsPage({ params }: { params: { id: string } }) {
       {status && !status.ok && (
         <div className="fail">❌ 验证失败 — {status.reason}</div>
       )}
+
+      <section style={{ marginTop: 24 }}>
+        <h2>可信度评估</h2>
+        {!analysis && (
+          <p style={{ fontSize: 14, color: "#666" }}>
+            尚未生成分析。这只是可信度信号，不代表真假判定。
+          </p>
+        )}
+        {analysis && <CredibilityCard analysis={analysis} />}
+        <button onClick={onAnalyze} disabled={analyzing} style={{ marginTop: 8 }}>
+          {analyzing ? "分析中…" : analysis ? "重新分析" : "生成分析"}
+        </button>
+        {analysisError && (
+          <div className="fail" style={{ marginTop: 8 }}>
+            {analysisError}
+          </div>
+        )}
+      </section>
     </main>
+  );
+}
+
+function CredibilityCard({ analysis }: { analysis: Analysis }) {
+  return (
+    <div
+      style={{
+        border: "1px solid #ddd",
+        borderRadius: 6,
+        padding: 12,
+        marginTop: 8,
+      }}
+    >
+      <div style={{ fontSize: 28, fontWeight: 600 }}>
+        可信度信号: {analysis.score}/100
+      </div>
+      <ul style={{ marginTop: 8, fontSize: 14 }}>
+        <li>
+          多源印证: {analysis.corroboration_count} 家其他来源
+          {analysis.corroboration_sources.length > 0 && (
+            <span> ({analysis.corroboration_sources.join("、")})</span>
+          )}
+        </li>
+        <li>
+          来源信誉: {analysis.reputation_label}
+          （权重 {analysis.reputation_weight.toFixed(2)}）
+        </li>
+        <li>
+          LLM 一致性:{" "}
+          {analysis.llm_consistency ?? "未运行"}
+          {analysis.llm_score !== null && (
+            <span> · 模型评分 {analysis.llm_score}/100</span>
+          )}
+          {analysis.llm_model && (
+            <span style={{ color: "#888" }}> · {analysis.llm_model}</span>
+          )}
+        </li>
+        {analysis.llm_summary && (
+          <li style={{ color: "#444" }}>{analysis.llm_summary}</li>
+        )}
+      </ul>
+      <p style={{ fontSize: 12, color: "#888", marginTop: 8 }}>
+        此评分为可信度信号的加权汇总，不构成对事件真伪的最终判定。
+      </p>
+    </div>
   );
 }
