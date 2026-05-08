@@ -214,6 +214,56 @@ class EventFollowup(Base):
     )
 
 
+class EventMergeProposal(Base):
+    __tablename__ = "event_merge_proposal"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("event.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    followup_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("event_followup.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    proposed_by: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    selected_developments: Mapped[list[dict]] = mapped_column(JSON, nullable=False)
+    proposed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    canonical_bytes: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    sig: Mapped[bytes] = mapped_column(LargeBinary(64), nullable=False)
+    pubkey: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="voting")
+    decided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class MergeProposalVote(Base):
+    __tablename__ = "merge_proposal_vote"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    proposal_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("event_merge_proposal.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    canonical_bytes: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    sig: Mapped[bytes] = mapped_column(LargeBinary(64), nullable=False)
+    voted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint("proposal_id", "user_id", name="uq_merge_proposal_vote_unique"),
+    )
+
+
 class MerkleAnchor(Base):
     __tablename__ = "merkle_anchor"
 

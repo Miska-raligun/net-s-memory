@@ -16,7 +16,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crypto.canonical import encode
 from app.crypto.merkle import leaf_hash
-from app.db.models import Analysis, MerkleLeaf, NewsSignature, Vote
+from app.db.models import (
+    Analysis,
+    EventMergeProposal,
+    MergeProposalVote,
+    MerkleLeaf,
+    NewsSignature,
+    Vote,
+)
 
 DOMAIN_TAGS: dict[str, bytes] = {
     "news": b"net-s-memory:news:v1\n",
@@ -119,6 +126,44 @@ async def append_vote(session: AsyncSession, vote: Vote) -> tuple[int, bytes]:
     user's client-side Ed25519 key before it reaches us. The server only
     verifies the signature (in the API handler) and persists.
     """
+    leaf_bytes = compute_leaf_bytes("vote", vote.canonical_bytes, vote.sig)
+    h = leaf_hash(leaf_bytes)
+    payload_digest = hashlib.sha256(vote.canonical_bytes).digest()
+    leaf = MerkleLeaf(
+        leaf_hash=h,
+        leaf_type="vote",
+        ref_id=vote.id,
+        payload_digest=payload_digest,
+    )
+    session.add(leaf)
+    await session.flush()
+    return leaf.seq, h
+
+
+async def append_merge_proposal(
+    session: AsyncSession, proposal: EventMergeProposal
+) -> tuple[int, bytes]:
+    """Append a leaf for a pre-signed merge proposal."""
+    leaf_bytes = compute_leaf_bytes(
+        "merge_proposal", proposal.canonical_bytes, proposal.sig
+    )
+    h = leaf_hash(leaf_bytes)
+    payload_digest = hashlib.sha256(proposal.canonical_bytes).digest()
+    leaf = MerkleLeaf(
+        leaf_hash=h,
+        leaf_type="merge_proposal",
+        ref_id=proposal.id,
+        payload_digest=payload_digest,
+    )
+    session.add(leaf)
+    await session.flush()
+    return leaf.seq, h
+
+
+async def append_merge_proposal_vote(
+    session: AsyncSession, vote: MergeProposalVote
+) -> tuple[int, bytes]:
+    """Append a leaf for a vote on a merge proposal (vote leaf type)."""
     leaf_bytes = compute_leaf_bytes("vote", vote.canonical_bytes, vote.sig)
     h = leaf_hash(leaf_bytes)
     payload_digest = hashlib.sha256(vote.canonical_bytes).digest()
