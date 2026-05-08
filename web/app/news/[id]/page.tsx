@@ -3,7 +3,15 @@
 import { useEffect, useState } from "react";
 
 import { API_BASE, type Analysis, type NewsDetail } from "@/lib/api";
+import { getUser } from "@/lib/identity";
 import { type ProofResponse, type VerificationStatus, verifyProof } from "@/lib/verify";
+import {
+  type MyVote,
+  type VoteAggregate,
+  castVote,
+  fetchAggregate,
+  fetchMyVote,
+} from "@/lib/vote";
 
 export default function NewsPage({ params }: { params: { id: string } }) {
   const [news, setNews] = useState<NewsDetail | null>(null);
@@ -13,6 +21,10 @@ export default function NewsPage({ params }: { params: { id: string } }) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [aggregate, setAggregate] = useState<VoteAggregate | null>(null);
+  const [myVote, setMyVote] = useState<MyVote | null>(null);
+  const [voteError, setVoteError] = useState<string | null>(null);
+  const [voting, setVoting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,10 +48,44 @@ export default function NewsPage({ params }: { params: { id: string } }) {
       .catch(() => {
         /* analysis is optional */
       });
+
+    fetchAggregate(params.id)
+      .then((a) => {
+        if (!cancelled) setAggregate(a);
+      })
+      .catch(() => {
+        /* ignore */
+      });
+    fetchMyVote(params.id)
+      .then((v) => {
+        if (!cancelled) setMyVote(v);
+      })
+      .catch(() => {
+        /* ignore */
+      });
+
     return () => {
       cancelled = true;
     };
   }, [params.id]);
+
+  async function onVote(score: number) {
+    setVoting(true);
+    setVoteError(null);
+    try {
+      await castVote(params.id, score, "");
+      const [agg, me] = await Promise.all([
+        fetchAggregate(params.id),
+        fetchMyVote(params.id),
+      ]);
+      setAggregate(agg);
+      setMyVote(me);
+    } catch (e) {
+      setVoteError((e as Error).message);
+    } finally {
+      setVoting(false);
+    }
+  }
 
   async function onAnalyze() {
     setAnalyzing(true);
@@ -113,6 +159,17 @@ export default function NewsPage({ params }: { params: { id: string } }) {
       )}
 
       <section style={{ marginTop: 24 }}>
+        <h2>社区投票</h2>
+        <VoteCard
+          aggregate={aggregate}
+          myVote={myVote}
+          onVote={onVote}
+          voting={voting}
+          error={voteError}
+        />
+      </section>
+
+      <section style={{ marginTop: 24 }}>
         <h2>可信度评估</h2>
         {!analysis && (
           <p style={{ fontSize: 14, color: "#666" }}>
@@ -131,6 +188,74 @@ export default function NewsPage({ params }: { params: { id: string } }) {
       </section>
     </main>
   );
+}
+
+function VoteCard({
+  aggregate,
+  myVote,
+  onVote,
+  voting,
+  error,
+}: {
+  aggregate: VoteAggregate | null;
+  myVote: MyVote | null;
+  onVote: (score: number) => void;
+  voting: boolean;
+  error: string | null;
+}) {
+  const user = getUser();
+  const hasVoted = myVote !== null;
+  return (
+    <div
+      style={{
+        border: "1px solid #ddd",
+        borderRadius: 6,
+        padding: 12,
+        marginTop: 8,
+      }}
+    >
+      <div style={{ fontSize: 14, color: "#444" }}>
+        {aggregate
+          ? `共 ${aggregate.vote_count} 票，加权倾向 ${aggregate.weighted_score.toFixed(2)}（-1 到 +1）`
+          : "尚无投票"}
+      </div>
+      {aggregate && aggregate.vote_count > 0 && (
+        <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
+          支持 {aggregate.score_breakdown["1"] ?? 0} · 中立{" "}
+          {aggregate.score_breakdown["0"] ?? 0} · 质疑{" "}
+          {aggregate.score_breakdown["-1"] ?? 0}
+        </div>
+      )}
+      {!user ? (
+        <p style={{ marginTop: 8, fontSize: 13, color: "#666" }}>
+          登录后可对该记录投票，投票将由你的浏览器密钥签名后写入 Merkle 日志。
+        </p>
+      ) : hasVoted ? (
+        <p style={{ marginTop: 8, fontSize: 13, color: "#444" }}>
+          你已投票：{labelForScore(myVote!.score)}
+        </p>
+      ) : (
+        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+          <button onClick={() => onVote(1)} disabled={voting}>
+            👍 支持
+          </button>
+          <button onClick={() => onVote(0)} disabled={voting}>
+            😐 中立
+          </button>
+          <button onClick={() => onVote(-1)} disabled={voting}>
+            👎 质疑
+          </button>
+        </div>
+      )}
+      {error && <div className="fail" style={{ marginTop: 8 }}>{error}</div>}
+    </div>
+  );
+}
+
+function labelForScore(s: number): string {
+  if (s > 0) return "支持";
+  if (s < 0) return "质疑";
+  return "中立";
 }
 
 function CredibilityCard({ analysis }: { analysis: Analysis }) {
