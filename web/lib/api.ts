@@ -117,3 +117,24 @@ export interface FollowupRecord {
   generated_at: string;
   payload: FollowupPayload;
 }
+
+export interface MergeProposal {
+  id: string;
+  event_id: string;
+  followup_id: string;
+  proposed_by: string;
+  selected_developments: FollowupDevelopment[];
+  proposed_at: string;
+  status: string;
+  decided_at: string | null;
+  pubkey: string;
+  sig: string;
+}
+
+export interface MergeProposalDetail extends MergeProposal {
+  aggregate: {
+    vote_count: number;
+    score_breakdown: Record<string, number>;
+    weighted_score: number;
+  };
+}

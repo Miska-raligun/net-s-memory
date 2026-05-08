@@ -184,48 +184,24 @@ async def test_create_proposal_signs_and_logs(
     # public key verifies over them. Skip happy-path here; instead test the
     # service-helper directly.
 
-    # Direct service-level test:
-    from app.db.models import UserAccount
-
-    user_row = (
-        await session.execute(
-            select(UserAccount).where(UserAccount.id == uuid.UUID(user_id))
-        )
-    ).scalar_one()
-    from app.proposals.merge import create_proposal, proposal_canonical
-
-    pid = uuid.uuid4()
-    can = proposal_canonical(
-        proposal_id=pid,
-        event_id=event_id,
-        followup_id=followup_id,
-        proposer_id=user_row.id,
-        selected_developments=devs,
-        proposed_at=proposed_at,
+    # Submit via the HTTP API: client provides its own proposal_id and
+    # signs the canonical containing it.
+    resp = await client.post(
+        f"/api/events/{event_id}/merge-proposals",
+        json={
+            "proposal_id": str(proposal_id),
+            "followup_id": str(followup_id),
+            "selected_developments": devs,
+            "proposed_at": proposed_at,
+            "sig": sig,
+        },
+        headers={"Authorization": f"Bearer {token}"},
     )
-    sig_bytes = proposer_key.sign(can).signature
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["id"] == str(proposal_id)
+    assert body["status"] == "voting"
 
-    # Monkey-patch uuid4 so create_proposal uses our pid.
-    import app.proposals.merge as mod
-
-    orig_uuid4 = mod.uuid.uuid4
-    mod.uuid.uuid4 = lambda: pid  # type: ignore[assignment]
-    try:
-        proposal = await create_proposal(
-            session=session,
-            event_id=event_id,
-            followup_id=followup_id,
-            user=user_row,
-            selected_developments=devs,
-            proposed_at=proposed_at,
-            sig_hex=sig_bytes.hex(),
-        )
-    finally:
-        mod.uuid.uuid4 = orig_uuid4
-
-    assert proposal.status == "voting"
-    assert proposal.canonical_bytes == can
-    # The merkle log gained a merge_proposal leaf.
     from app.db.models import MerkleLeaf
 
     leaf = (
@@ -233,9 +209,22 @@ async def test_create_proposal_signs_and_logs(
             select(MerkleLeaf).where(MerkleLeaf.leaf_type == "merge_proposal")
         )
     ).scalar_one()
-    assert leaf.ref_id == proposal.id
-    # silence unused
-    _ = (token, sig, canonical, proposal_id)
+    assert leaf.ref_id == proposal_id
+
+    # Re-submitting the same proposal_id is a 409.
+    resp_dup = await client.post(
+        f"/api/events/{event_id}/merge-proposals",
+        json={
+            "proposal_id": str(proposal_id),
+            "followup_id": str(followup_id),
+            "selected_developments": devs,
+            "proposed_at": proposed_at,
+            "sig": sig,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp_dup.status_code == 409
+    _ = canonical
 
 
 @pytest.mark.asyncio
@@ -261,12 +250,10 @@ async def test_proposal_passes_after_three_yes_votes(
     )
     app.dependency_overrides[get_llm_for_followup] = lambda: _FakeLLM({})
     try:
-        # Create the proposal via service helper (signing flow tested above).
-        from app.db.models import UserAccount
-        from app.proposals.merge import create_proposal, proposal_canonical
+        from app.proposals.merge import proposal_canonical
 
         proposer_key = SigningKey.generate()
-        await client.post(
+        sr = await client.post(
             "/api/auth/signup",
             json={
                 "email": "p@x.com",
@@ -274,37 +261,30 @@ async def test_proposal_passes_after_three_yes_votes(
                 "pubkey": bytes(proposer_key.verify_key).hex(),
             },
         )
-        proposer = (
-            await session.execute(
-                select(UserAccount).where(UserAccount.email == "p@x.com")
-            )
-        ).scalar_one()
-
-        import app.proposals.merge as mod
+        proposer_token = sr.json()["token"]
+        proposer_id = sr.json()["user"]["id"]
 
         pid = uuid.uuid4()
         can = proposal_canonical(
             proposal_id=pid,
             event_id=event_id,
             followup_id=followup_id,
-            proposer_id=proposer.id,
+            proposer_id=uuid.UUID(proposer_id),
             selected_developments=devs,
             proposed_at="2026-05-08T12:00:00Z",
         )
-        orig_uuid4 = mod.uuid.uuid4
-        mod.uuid.uuid4 = lambda: pid  # type: ignore[assignment]
-        try:
-            await create_proposal(
-                session=session,
-                event_id=event_id,
-                followup_id=followup_id,
-                user=proposer,
-                selected_developments=devs,
-                proposed_at="2026-05-08T12:00:00Z",
-                sig_hex=proposer_key.sign(can).signature.hex(),
-            )
-        finally:
-            mod.uuid.uuid4 = orig_uuid4
+        rp = await client.post(
+            f"/api/events/{event_id}/merge-proposals",
+            json={
+                "proposal_id": str(pid),
+                "followup_id": str(followup_id),
+                "selected_developments": devs,
+                "proposed_at": "2026-05-08T12:00:00Z",
+                "sig": proposer_key.sign(can).signature.hex(),
+            },
+            headers={"Authorization": f"Bearer {proposer_token}"},
+        )
+        assert rp.status_code == 200, rp.text
 
         # Three different voters each cast +1.
         for i in range(3):
@@ -377,11 +357,10 @@ async def test_proposal_vote_rejects_bad_signature(
     service_key = SigningKey.generate()
     app.dependency_overrides[get_signing_key] = lambda: service_key
     try:
-        from app.db.models import UserAccount
-        from app.proposals.merge import create_proposal, proposal_canonical
+        from app.proposals.merge import proposal_canonical
 
         proposer_key = SigningKey.generate()
-        r = await client.post(
+        sr = await client.post(
             "/api/auth/signup",
             json={
                 "email": "p2@x.com",
@@ -389,37 +368,30 @@ async def test_proposal_vote_rejects_bad_signature(
                 "pubkey": bytes(proposer_key.verify_key).hex(),
             },
         )
-        proposer = (
-            await session.execute(
-                select(UserAccount).where(UserAccount.email == "p2@x.com")
-            )
-        ).scalar_one()
-
-        import app.proposals.merge as mod
+        proposer_token = sr.json()["token"]
+        proposer_id = sr.json()["user"]["id"]
 
         pid = uuid.uuid4()
         can = proposal_canonical(
             proposal_id=pid,
             event_id=event_id,
             followup_id=followup_id,
-            proposer_id=proposer.id,
+            proposer_id=uuid.UUID(proposer_id),
             selected_developments=devs,
             proposed_at="2026-05-08T12:00:00Z",
         )
-        orig_uuid4 = mod.uuid.uuid4
-        mod.uuid.uuid4 = lambda: pid  # type: ignore[assignment]
-        try:
-            await create_proposal(
-                session=session,
-                event_id=event_id,
-                followup_id=followup_id,
-                user=proposer,
-                selected_developments=devs,
-                proposed_at="2026-05-08T12:00:00Z",
-                sig_hex=proposer_key.sign(can).signature.hex(),
-            )
-        finally:
-            mod.uuid.uuid4 = orig_uuid4
+        rp = await client.post(
+            f"/api/events/{event_id}/merge-proposals",
+            json={
+                "proposal_id": str(pid),
+                "followup_id": str(followup_id),
+                "selected_developments": devs,
+                "proposed_at": "2026-05-08T12:00:00Z",
+                "sig": proposer_key.sign(can).signature.hex(),
+            },
+            headers={"Authorization": f"Bearer {proposer_token}"},
+        )
+        assert rp.status_code == 200
 
         # voter signs with a key that doesn't match their registered pubkey
         voter_key_correct = SigningKey.generate()
@@ -449,8 +421,6 @@ async def test_proposal_vote_rejects_bad_signature(
             headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code == 400
-
-        _ = r
     finally:
         app.dependency_overrides.pop(get_signing_key, None)
 

@@ -121,6 +121,7 @@ async def aggregate(
 async def create_proposal(
     session: AsyncSession,
     *,
+    proposal_id: uuid.UUID,
     event_id: uuid.UUID,
     followup_id: uuid.UUID,
     user: UserAccount,
@@ -131,6 +132,9 @@ async def create_proposal(
     if not selected_developments:
         raise ValueError("must select at least one development")
 
+    if (await session.get(EventMergeProposal, proposal_id)) is not None:
+        raise ValueError("proposal id already exists")
+
     followup = await session.get(EventFollowup, followup_id)
     if followup is None or followup.event_id != event_id:
         raise ValueError("followup does not belong to event")
@@ -140,7 +144,6 @@ async def create_proposal(
         if d.get("summary") not in valid_summaries:
             raise ValueError("selected development not found in followup")
 
-    proposal_id = uuid.uuid4()
     canonical = proposal_canonical(
         proposal_id=proposal_id,
         event_id=event_id,

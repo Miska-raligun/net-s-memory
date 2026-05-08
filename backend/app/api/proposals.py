@@ -24,6 +24,7 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 class ProposalRequest(BaseModel):
+    proposal_id: str
     followup_id: str
     selected_developments: list[dict[str, Any]] = Field(min_length=1)
     proposed_at: str
@@ -60,11 +61,13 @@ async def post_proposal(
 ) -> dict[str, Any]:
     try:
         followup_id = uuid.UUID(req.followup_id)
+        proposal_id = uuid.UUID(req.proposal_id)
     except ValueError as e:
-        raise HTTPException(400, "invalid followup_id") from e
+        raise HTTPException(400, "invalid uuid") from e
     try:
         proposal = await create_proposal(
             session=session,
+            proposal_id=proposal_id,
             event_id=event_id,
             followup_id=followup_id,
             user=user,
@@ -73,7 +76,10 @@ async def post_proposal(
             sig_hex=req.sig,
         )
     except ValueError as e:
-        raise HTTPException(400, str(e)) from e
+        msg = str(e)
+        if "already exists" in msg:
+            raise HTTPException(409, msg) from e
+        raise HTTPException(400, msg) from e
     return _serialize_proposal(proposal)
 
 
