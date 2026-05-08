@@ -56,6 +56,9 @@ def _serialize_user(user: UserAccount) -> dict[str, Any]:
         "id": str(user.id),
         "email": user.email,
         "pubkey": user.pubkey_ed25519.hex(),
+        "encrypted_privkey": (
+            user.encrypted_privkey.hex() if user.encrypted_privkey else None
+        ),
         "reputation": user.reputation,
         "created_at": user.created_at.isoformat(),
     }

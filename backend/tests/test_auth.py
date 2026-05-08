@@ -57,6 +57,7 @@ async def test_signup_then_login_then_me(client: AsyncClient) -> None:
     body = r.json()
     assert body["user"]["email"] == "alice@example.com"
     assert body["user"]["pubkey"] == pubkey
+    assert body["user"]["encrypted_privkey"] is None
     assert body["user"]["reputation"] == 0.0
     token1 = body["token"]
     assert token1
@@ -71,6 +72,30 @@ async def test_signup_then_login_then_me(client: AsyncClient) -> None:
     r3 = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {token2}"})
     assert r3.status_code == 200
     assert r3.json()["email"] == "alice@example.com"
+
+
+@pytest.mark.asyncio
+async def test_signup_with_encrypted_privkey_returns_it(client: AsyncClient) -> None:
+    pubkey = _new_pubkey_hex()
+    enc = "00" * 88  # 88 bytes is the size we use for argon+secretbox blob
+    r = await client.post(
+        "/api/auth/signup",
+        json={
+            "email": "enc@example.com",
+            "password": "supersecret123",
+            "pubkey": pubkey,
+            "encrypted_privkey": enc,
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["user"]["encrypted_privkey"] == enc
+
+    r2 = await client.post(
+        "/api/auth/login",
+        json={"email": "enc@example.com", "password": "supersecret123"},
+    )
+    assert r2.json()["user"]["encrypted_privkey"] == enc
 
 
 @pytest.mark.asyncio
