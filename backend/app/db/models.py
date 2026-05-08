@@ -135,6 +135,29 @@ class UserAccount(Base):
     )
 
 
+class Vote(Base):
+    __tablename__ = "vote"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    news_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("news_item.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    sig: Mapped[bytes] = mapped_column(LargeBinary(64), nullable=False)
+    canonical_bytes: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    voted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint("news_id", "user_id", name="uq_vote_news_user"),
+    )
+
+
 class MerkleAnchor(Base):
     __tablename__ = "merkle_anchor"
 

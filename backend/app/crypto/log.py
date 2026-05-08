@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crypto.canonical import encode
 from app.crypto.merkle import leaf_hash
-from app.db.models import Analysis, MerkleLeaf, NewsSignature
+from app.db.models import Analysis, MerkleLeaf, NewsSignature, Vote
 
 DOMAIN_TAGS: dict[str, bytes] = {
     "news": b"net-s-memory:news:v1\n",
@@ -109,4 +109,25 @@ async def append_analysis_signed(
     session.add(leaf)
     await session.flush()
 
+    return leaf.seq, h
+
+
+async def append_vote(session: AsyncSession, vote: Vote) -> tuple[int, bytes]:
+    """Append a Merkle leaf for an already-signed vote.
+
+    Unlike news/analysis we don't sign here — the vote is signed by the
+    user's client-side Ed25519 key before it reaches us. The server only
+    verifies the signature (in the API handler) and persists.
+    """
+    leaf_bytes = compute_leaf_bytes("vote", vote.canonical_bytes, vote.sig)
+    h = leaf_hash(leaf_bytes)
+    payload_digest = hashlib.sha256(vote.canonical_bytes).digest()
+    leaf = MerkleLeaf(
+        leaf_hash=h,
+        leaf_type="vote",
+        ref_id=vote.id,
+        payload_digest=payload_digest,
+    )
+    session.add(leaf)
+    await session.flush()
     return leaf.seq, h
