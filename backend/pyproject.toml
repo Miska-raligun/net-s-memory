@@ -18,6 +18,7 @@ dependencies = [
     "redis>=5.2",
     "pynacl>=1.5",
     "httpx>=0.28",
+    "opentimestamps-client>=0.7",
 ]
 
 [project.optional-dependencies]

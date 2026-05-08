@@ -96,7 +96,7 @@ async def get_proof(news_id: uuid.UUID, session: SessionDep) -> dict:
         "leaf_index": leaf_index,
         "tree_size": state.size,
         "root_hash": root.hex(),
-        "canonical": sig.canonical_bytes.decode("ascii"),
+        "canonical": sig.canonical_bytes.decode("latin-1"),
         "signature": sig.sig.hex(),
         "pubkey": sig.pubkey.hex(),
         "signer": sig.signer,

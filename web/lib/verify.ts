@@ -124,7 +124,15 @@ export type VerificationStatus =
   | { ok: true; recomputedLeafHash: string; root: string; treeSize: number }
   | { ok: false; reason: string };
 
-export async function verifyProof(p: ProofResponse): Promise<VerificationStatus> {
+export interface ExpectedContent {
+  title?: string;
+  raw_text?: string;
+}
+
+export async function verifyProof(
+  p: ProofResponse,
+  expected?: ExpectedContent,
+): Promise<VerificationStatus> {
   let leafHash: Uint8Array;
   try {
     const canonical = new TextEncoder().encode(p.canonical);
@@ -142,8 +150,38 @@ export async function verifyProof(p: ProofResponse): Promise<VerificationStatus>
   }
   const root = hexToBytes(p.root_hash);
   const proofBytes = p.audit_path.map(hexToBytes);
-  const ok = await verifyInclusion(leafHash, p.leaf_index, p.tree_size, proofBytes, root);
-  if (!ok) return { ok: false, reason: "inclusion proof did not reproduce the root hash" };
+  const inclusionOk = await verifyInclusion(
+    leafHash,
+    p.leaf_index,
+    p.tree_size,
+    proofBytes,
+    root,
+  );
+  if (!inclusionOk) {
+    return { ok: false, reason: "inclusion proof did not reproduce the root hash" };
+  }
+
+  if (expected) {
+    let signed: { title?: unknown; raw_text?: unknown };
+    try {
+      signed = JSON.parse(p.canonical) as typeof signed;
+    } catch (e) {
+      return { ok: false, reason: `canonical is not valid JSON: ${(e as Error).message}` };
+    }
+    if (expected.title !== undefined && signed.title !== expected.title) {
+      return {
+        ok: false,
+        reason: "页面显示的标题与签名时的标题不一致：数据库可能被改动",
+      };
+    }
+    if (expected.raw_text !== undefined && signed.raw_text !== expected.raw_text) {
+      return {
+        ok: false,
+        reason: "页面显示的正文与签名时的正文不一致：数据库可能被改动",
+      };
+    }
+  }
+
   return {
     ok: true,
     recomputedLeafHash: claimedLeafHashHex,

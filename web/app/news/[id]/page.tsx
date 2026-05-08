@@ -39,7 +39,8 @@ export default function NewsPage({ params }: { params: { id: string } }) {
         return;
       }
       const proof: ProofResponse = await r.json();
-      setStatus(await verifyProof(proof));
+      const expected = news ? { title: news.title, raw_text: news.raw_text } : undefined;
+      setStatus(await verifyProof(proof, expected));
     } catch (e) {
       setStatus({ ok: false, reason: (e as Error).message });
     } finally {
