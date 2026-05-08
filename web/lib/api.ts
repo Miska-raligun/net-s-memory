@@ -83,3 +83,37 @@ export interface EventDetail {
   updated_at: string;
   timeline: EventTimelineEntry[];
 }
+
+export interface FollowupDevelopment {
+  date: string;
+  summary: string;
+  citations: string[];
+  source_count: number;
+}
+
+export interface FollowupPayload {
+  event_id: string;
+  since: string;
+  developments: FollowupDevelopment[];
+  leads: string[];
+  still_unanswered: string[];
+  status_suggestion: string;
+  search_results: {
+    title: string;
+    url: string;
+    snippet: string;
+    source: string;
+    published_at: string | null;
+  }[];
+}
+
+export interface FollowupRecord {
+  id: string;
+  event_id: string;
+  requested_by: string | null;
+  model: string;
+  search_provider: string;
+  status: string;
+  generated_at: string;
+  payload: FollowupPayload;
+}

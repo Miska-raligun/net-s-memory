@@ -31,5 +31,10 @@ class Settings(BaseSettings):
     jwt_ttl_days: int = 7
     hcaptcha_secret: str = ""
 
+    search_provider: str = ""
+    search_base_url: str = ""
+    search_api_key: str = ""
+    search_timeout: float = 30.0
+
 
 settings = Settings()
