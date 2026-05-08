@@ -47,3 +47,39 @@ export interface Analysis {
   signer: string;
   alg: string;
 }
+
+export interface EventListItem {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  status: string;
+  news_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventTimelineEntry {
+  kind: string;
+  position: number;
+  added_at: string;
+  news: {
+    id: string;
+    source: string;
+    source_url: string;
+    title: string;
+    raw_text: string;
+    fetched_at: string;
+  };
+}
+
+export interface EventDetail {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  timeline: EventTimelineEntry[];
+}

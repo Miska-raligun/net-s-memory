@@ -27,6 +27,7 @@ export default function Nav() {
       }}
     >
       <Link href="/">首页</Link>
+      <Link href="/events">事件</Link>
       <Link href="/transparency">透明度</Link>
       <span style={{ flex: 1 }} />
       {user ? (

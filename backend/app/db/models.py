@@ -158,6 +158,43 @@ class Vote(Base):
     )
 
 
+class Event(Base):
+    __tablename__ = "event"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    slug: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="ongoing")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+
+class EventNews(Base):
+    __tablename__ = "event_news"
+
+    id: Mapped[int] = mapped_column(_AutoBigInt, primary_key=True, autoincrement=True)
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("event.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    news_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("news_item.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="update")
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint("event_id", "news_id", name="uq_event_news_pair"),
+    )
+
+
 class MerkleAnchor(Base):
     __tablename__ = "merkle_anchor"
 
