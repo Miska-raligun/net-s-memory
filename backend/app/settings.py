@@ -21,5 +21,11 @@ class Settings(BaseSettings):
 
     service_signing_key_path: str = "./keys/service.ed25519"
 
+    llm_provider: str = "openai_compatible"
+    llm_base_url: str = ""
+    llm_api_key: str = ""
+    llm_model: str = "gpt-4o-mini"
+    llm_timeout: float = 60.0
+
 
 settings = Settings()
