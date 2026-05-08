@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
     analysis,
@@ -13,6 +14,15 @@ from app.api import (
 from app.settings import settings
 
 app = FastAPI(title="net-s-memory", version="0.1.0")
+
+if settings.cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(news.router)
 app.include_router(transparency.router)

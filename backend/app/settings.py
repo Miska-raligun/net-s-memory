@@ -36,5 +36,7 @@ class Settings(BaseSettings):
     search_api_key: str = ""
     search_timeout: float = 30.0
 
+    cors_origins: str = ""
+
 
 settings = Settings()
