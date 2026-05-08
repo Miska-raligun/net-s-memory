@@ -121,6 +121,20 @@ class Analysis(Base):
     canonical_bytes: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
 
+class UserAccount(Base):
+    __tablename__ = "user_account"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    pubkey_ed25519: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False)
+    encrypted_privkey: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    reputation: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+
 class MerkleAnchor(Base):
     __tablename__ = "merkle_anchor"
 

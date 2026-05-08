@@ -27,5 +27,9 @@ class Settings(BaseSettings):
     llm_model: str = "gpt-4o-mini"
     llm_timeout: float = 60.0
 
+    jwt_secret: str = "change-me-in-prod"
+    jwt_ttl_days: int = 7
+    hcaptcha_secret: str = ""
+
 
 settings = Settings()
