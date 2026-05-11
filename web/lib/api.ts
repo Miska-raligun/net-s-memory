@@ -9,11 +9,39 @@ export interface NewsListItem {
   fetched_at: string;
   hot_rank: number | null;
   lang: string;
+  classification: string | null;
+  summary: string | null;
+  why_matters: string | null;
+  curator: string | null;
+}
+
+export interface NewsCitation {
+  source: string;
+  source_url: string;
+  source_id: string;
+  title: string;
 }
 
 export interface NewsDetail extends NewsListItem {
   raw_text: string;
   source_id: string | null;
+  citations: NewsCitation[];
+}
+
+export interface CandidateItem {
+  id: string;
+  source: string;
+  source_url: string;
+  source_id: string | null;
+  title: string;
+  raw_text: string;
+  lang: string;
+  hot_rank: number | null;
+  fetched_at: string;
+  status: "pending" | "curated" | "rejected";
+  news_item_id: string | null;
+  rejected_reason: string | null;
+  decided_at: string | null;
 }
 
 export interface Anchor {

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.crypto.anchor import anchor_log
 from app.db.models import MerkleAnchor
 from app.ingest.base import NewsItemDraft
-from app.ingest.pipeline import ingest_drafts
+from tests.conftest import seed_news
 
 
 def _draft(source_id: str) -> NewsItemDraft:
@@ -32,7 +32,7 @@ async def test_anchor_log_writes_row_and_ots_file(
     session: AsyncSession, tmp_path: Path
 ) -> None:
     key = SigningKey.generate()
-    await ingest_drafts(session, [_draft("a"), _draft("b"), _draft("c")], "service:v1", key)
+    await seed_news(session, [_draft("a"), _draft("b"), _draft("c")], key)
 
     seen_root: list[bytes] = []
 

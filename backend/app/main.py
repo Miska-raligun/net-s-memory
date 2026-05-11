@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import (
     analysis,
     auth,
+    candidates,
     events,
     followup,
     news,
@@ -32,6 +33,7 @@ app.include_router(vote.router)
 app.include_router(events.router)
 app.include_router(followup.router)
 app.include_router(proposals.router)
+app.include_router(candidates.router)
 
 
 @app.get("/health")

@@ -99,11 +99,17 @@ cat <<EOF
 
 Follow-up commands:
 
-  # Pull a hot list and produce signed news leaves
+  # 1. Pull a hot list into the candidate pool (no signing yet)
   docker compose -f $COMPOSE_FILE --env-file $ENV_FILE \
       exec api python -m app.ingest.run_once zhihu
 
-  # Cluster collected news into events
+  # 2. Let the LLM curator decide which candidates are worth recording.
+  #    Promoted clusters become signed NewsItems on the public timeline;
+  #    rejected ones stay in /candidates with the LLM's reason.
+  docker compose -f $COMPOSE_FILE --env-file $ENV_FILE \
+      exec api python -m app.curate.run
+
+  # 3. Cluster the curated NewsItems into multi-day events
   docker compose -f $COMPOSE_FILE --env-file $ENV_FILE \
       exec api python -m app.events.run
 

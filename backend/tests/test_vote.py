@@ -14,7 +14,7 @@ from app.crypto.log import compute_leaf_bytes
 from app.crypto.merkle import leaf_hash
 from app.db.models import MerkleLeaf, Vote
 from app.ingest.base import NewsItemDraft
-from app.ingest.pipeline import ingest_drafts
+from tests.conftest import seed_news
 
 
 def _draft(sid: str, title: str = "标题") -> NewsItemDraft:
@@ -32,7 +32,7 @@ def _draft(sid: str, title: str = "标题") -> NewsItemDraft:
 
 async def _ingest_one(session: AsyncSession) -> str:
     key = SigningKey.generate()
-    await ingest_drafts(session, [_draft("a", "事件A")], "service:v1", key)
+    await seed_news(session, [_draft("a", "事件A")], key)
     rows = (await session.execute(select(_news_id_col()))).scalars().all()
     return str(rows[0])
 

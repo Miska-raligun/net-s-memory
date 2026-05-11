@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.analysis import get_llm_client, get_signing_key
 from app.ingest.base import NewsItemDraft
-from app.ingest.pipeline import ingest_drafts
 from app.main import app
+from tests.conftest import seed_news
 
 
 class _FakeLLM:
@@ -68,14 +68,13 @@ async def test_post_then_get_analysis(
     llm_override: _FakeLLM,
 ) -> None:
     ingest_key = signing_key_override
-    await ingest_drafts(
+    await seed_news(
         session,
         [
             _draft("zhihu_hot", "a", "化工厂凌晨发生大火"),
             _draft("weibo_hot", "b", "化工厂凌晨发生大火 现场无明火"),
             _draft("baidu_hot", "c", "化工厂凌晨发生大火 暂无伤亡"),
         ],
-        "service:v1",
         ingest_key,
     )
 
@@ -107,8 +106,8 @@ async def test_post_analysis_idempotent(
     signing_key_override: SigningKey,
     llm_override: _FakeLLM,
 ) -> None:
-    await ingest_drafts(
-        session, [_draft("zhihu_hot", "x", "孤立标题")], "service:v1", signing_key_override
+    await seed_news(
+        session, [_draft("zhihu_hot", "x", "孤立标题")], signing_key_override
     )
     r_list = await client.get("/api/news")
     nid = r_list.json()[0]["id"]

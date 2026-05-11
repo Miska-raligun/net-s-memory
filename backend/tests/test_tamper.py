@@ -32,7 +32,7 @@ from app.crypto.log import compute_leaf_bytes
 from app.crypto.merkle import leaf_hash, verify_inclusion
 from app.db.models import NewsItem, NewsSignature
 from app.ingest.base import NewsItemDraft
-from app.ingest.pipeline import ingest_drafts
+from tests.conftest import seed_news
 
 
 def _draft(source_id: str, title: str = "原标题") -> NewsItemDraft:
@@ -71,7 +71,7 @@ async def test_news_item_tamper_breaks_content_check_only(
     session: AsyncSession, client: AsyncClient
 ) -> None:
     key = SigningKey.generate()
-    await ingest_drafts(session, [_draft("a")], "service:v1", key)
+    await seed_news(session, [_draft("a")], key)
 
     listing = (await client.get("/api/news")).json()
     nid = listing[0]["id"]
@@ -101,7 +101,7 @@ async def test_canonical_tamper_breaks_crypto_check(
     session: AsyncSession, client: AsyncClient
 ) -> None:
     key = SigningKey.generate()
-    await ingest_drafts(session, [_draft("a")], "service:v1", key)
+    await seed_news(session, [_draft("a")], key)
 
     listing = (await client.get("/api/news")).json()
     nid = listing[0]["id"]
@@ -121,7 +121,7 @@ async def test_signature_tamper_breaks_crypto_check(
     session: AsyncSession, client: AsyncClient
 ) -> None:
     key = SigningKey.generate()
-    await ingest_drafts(session, [_draft("a")], "service:v1", key)
+    await seed_news(session, [_draft("a")], key)
 
     listing = (await client.get("/api/news")).json()
     nid = listing[0]["id"]

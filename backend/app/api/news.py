@@ -39,6 +39,10 @@ async def list_news(session: SessionDep, limit: int = 50, offset: int = 0) -> li
             "lang": r.lang,
             "hot_rank": r.hot_rank,
             "fetched_at": r.fetched_at.isoformat(),
+            "classification": r.classification,
+            "summary": r.summary,
+            "why_matters": r.why_matters,
+            "curator": r.curator,
         }
         for r in rows
     ]
@@ -61,6 +65,11 @@ async def get_news(news_id: uuid.UUID, session: SessionDep) -> dict:
         "lang": item.lang,
         "hot_rank": item.hot_rank,
         "fetched_at": item.fetched_at.isoformat(),
+        "classification": item.classification,
+        "summary": item.summary,
+        "why_matters": item.why_matters,
+        "citations": item.citations or [],
+        "curator": item.curator,
     }
 
 

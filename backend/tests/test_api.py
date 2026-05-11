@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.crypto.log import compute_leaf_bytes
 from app.crypto.merkle import leaf_hash, verify_inclusion
 from app.ingest.base import NewsItemDraft
-from app.ingest.pipeline import ingest_drafts
+from tests.conftest import seed_news
 
 
 def _draft(source_id: str, title: str = "标题") -> NewsItemDraft:
@@ -36,7 +36,7 @@ async def test_health(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_list_and_detail(session: AsyncSession, client: AsyncClient) -> None:
     key = SigningKey.generate()
-    await ingest_drafts(session, [_draft("a", "事件A"), _draft("b", "事件B")], "service:v1", key)
+    await seed_news(session, [_draft("a", "事件A"), _draft("b", "事件B")], key)
 
     r = await client.get("/api/news")
     assert r.status_code == 200
@@ -53,7 +53,7 @@ async def test_list_and_detail(session: AsyncSession, client: AsyncClient) -> No
 async def test_proof_round_trip(session: AsyncSession, client: AsyncClient) -> None:
     key = SigningKey.generate()
     drafts = [_draft(f"id-{i}", f"事件{i}") for i in range(5)]
-    await ingest_drafts(session, drafts, "service:v1", key)
+    await seed_news(session, drafts, key)
 
     r = await client.get("/api/news")
     items = r.json()
@@ -97,7 +97,7 @@ async def test_transparency_reflects_log_state(
     assert body0["root_hash"] is None
 
     key = SigningKey.generate()
-    await ingest_drafts(session, [_draft(f"id-{i}") for i in range(3)], "service:v1", key)
+    await seed_news(session, [_draft(f"id-{i}") for i in range(3)], key)
 
     r1 = await client.get("/api/transparency")
     body1 = r1.json()

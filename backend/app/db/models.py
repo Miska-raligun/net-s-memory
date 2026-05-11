@@ -48,6 +48,14 @@ class NewsItem(Base):
     hot_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
     snapshot_uri: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Curation fields populated when an item is produced by the LLM curator
+    # rather than by direct ingest. Left null for legacy / manually-seeded rows.
+    classification: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    why_matters: Mapped[str | None] = mapped_column(Text, nullable=True)
+    citations: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    curator: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
     signatures: Mapped[list[NewsSignature]] = relationship(
         back_populates="news",
         cascade="all, delete-orphan",
@@ -55,6 +63,46 @@ class NewsItem(Base):
 
     __table_args__ = (
         UniqueConstraint("source", "source_id", name="uq_news_item_source_source_id"),
+    )
+
+
+class NewsCandidate(Base):
+    """A raw item pulled from an aggregator before the LLM has judged it.
+
+    Candidates are the input to the curator. The curator decides what (if
+    anything) is worth recording on the public, signed timeline, and either
+    promotes a cluster of candidates into a single NewsItem (status='curated')
+    or marks them rejected with a reason (status='rejected'). Candidates
+    themselves are never signed and never enter the Merkle log.
+    """
+
+    __tablename__ = "news_candidate"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    source_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    lang: Mapped[str] = mapped_column(String(8), nullable=False, default="zh")
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    hot_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    news_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("news_item.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    rejected_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "source", "source_id", name="uq_news_candidate_source_source_id"
+        ),
     )
 
 

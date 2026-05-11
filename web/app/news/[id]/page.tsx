@@ -131,14 +131,55 @@ export default function NewsPage({ params }: { params: { id: string } }) {
   return (
     <main>
       <h1>{news.title}</h1>
-      <p>
-        来源：
+      {news.classification && (
+        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 8 }}>
+          分类: <strong>{news.classification}</strong>
+          {news.curator && <span> · 策展: {news.curator}</span>}
+        </div>
+      )}
+      {news.summary && (
+        <p style={{ fontSize: 15, color: "#1f2937" }}>{news.summary}</p>
+      )}
+      {news.why_matters && (
+        <p
+          style={{
+            fontSize: 13,
+            color: "#374151",
+            background: "#f9fafb",
+            padding: 8,
+            borderRadius: 4,
+            borderLeft: "3px solid #6366f1",
+          }}
+        >
+          <strong>为何记录:</strong> {news.why_matters}
+        </p>
+      )}
+      <p style={{ fontSize: 13, color: "#6b7280" }}>
+        主要来源：
         <a href={news.source_url} target="_blank" rel="noreferrer">
           {news.source}
         </a>
+        {" · "}采集时间 {new Date(news.fetched_at).toLocaleString("zh-CN")}
       </p>
-      <p>采集时间：{news.fetched_at}</p>
-      <article>{news.raw_text || "(无正文摘要)"}</article>
+      {news.citations && news.citations.length > 1 && (
+        <details style={{ fontSize: 13, marginTop: 8 }}>
+          <summary>共 {news.citations.length} 个来源</summary>
+          <ul style={{ marginTop: 4 }}>
+            {news.citations.map((c, i) => (
+              <li key={i}>
+                <a href={c.source_url} target="_blank" rel="noreferrer">
+                  [{c.source}] {c.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {!news.summary && (
+        <article style={{ marginTop: 12 }}>
+          {news.raw_text || "(无正文摘要)"}
+        </article>
+      )}
 
       <button onClick={onVerify} disabled={verifying}>
         {verifying ? "验证中…" : "验证不可篡改"}
