@@ -21,9 +21,11 @@ def build_search_client(s: Settings | None = None) -> SearchClient | None:
     if provider == "stub":
         return StubSearchClient()
     if provider == "minimax":
+        # Hosts are region-locked. Default to the global host; mainland users
+        # set SEARCH_BASE_URL=https://api.minimaxi.com explicitly.
         return MinimaxSearchClient(
             api_key=s.search_api_key,
-            base_url=s.search_base_url or "https://api.minimaxi.chat/v1",
+            base_url=s.search_base_url or "https://api.minimax.io",
             timeout=s.search_timeout,
         )
     raise ValueError(f"unknown SEARCH_PROVIDER {provider!r}")
