@@ -121,7 +121,17 @@ async def analyze_news(
         raise ValueError(f"news {news_id} not found")
 
     corroborating = await find_corroborating(session, item)
-    sources = sorted({c.source for c in corroborating} - {item.source})
+
+    # Discover-curated items embed citations from multiple sources directly
+    # in the record. Count those as corroboration alongside DB matches.
+    embedded_citations = item.citations or []
+    embedded_sources = sorted(
+        {c["source"] for c in embedded_citations if c.get("source")}
+        - {item.source}
+    )
+    db_sources = sorted({c.source for c in corroborating} - {item.source})
+    all_sources = sorted(set(embedded_sources) | set(db_sources))
+    total_corroboration = len(corroborating) + len(embedded_citations)
 
     rep_label, rep_weight = source_reputation.lookup(item.source)
 
@@ -131,7 +141,10 @@ async def analyze_news(
     llm_evidence: dict[str, Any] | None = None
     llm_model: str | None = None
 
-    if llm_client is not None and corroborating:
+    if llm_client is not None:
+        corr_tuples = [(c.source, c.title, c.raw_text) for c in corroborating[:5]]
+        for c in embedded_citations[:5]:
+            corr_tuples.append((c.get("source", ""), c.get("title", ""), ""))
         try:
             result = await llm_check(
                 client=llm_client,
@@ -139,7 +152,7 @@ async def analyze_news(
                     target_source=item.source,
                     target_title=item.title,
                     target_text=item.raw_text,
-                    corroborating=[(c.source, c.title, c.raw_text) for c in corroborating[:5]],
+                    corroborating=corr_tuples,
                 ),
             )
             llm_score = result.score
@@ -151,7 +164,7 @@ async def analyze_news(
             logger.warning("LLM check failed for news %s: %s", news_id, e)
 
     breakdown = combine_signals(
-        corroboration_count=len(corroborating),
+        corroboration_count=total_corroboration,
         reputation_weight=rep_weight,
         llm_score=llm_score,
     )
@@ -160,8 +173,8 @@ async def analyze_news(
         id=uuid.uuid4(),
         news_id=news_id,
         score=breakdown.total,
-        corroboration_count=len(corroborating),
-        corroboration_sources=sources,
+        corroboration_count=total_corroboration,
+        corroboration_sources=all_sources,
         reputation_label=rep_label,
         reputation_weight=rep_weight,
         llm_score=llm_score,

@@ -13,6 +13,7 @@ OPENAI_COMPAT_BASES: dict[str, str] = {
     "openai": "https://api.openai.com/v1",
     "openai_compatible": "",
     "deepseek": "https://api.deepseek.com/v1",
+    "siliconflow": "https://api.siliconflow.cn/v1",
     "minimax": "https://api.minimaxi.chat/v1",
     "moonshot": "https://api.moonshot.cn/v1",
     "kimi": "https://api.moonshot.cn/v1",

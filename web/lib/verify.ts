@@ -162,7 +162,7 @@ export async function verifyProof(
   }
 
   if (expected) {
-    let signed: { title?: unknown; raw_text?: unknown };
+    let signed: { title?: unknown; raw_text?: unknown; summary?: unknown };
     try {
       signed = JSON.parse(p.canonical) as typeof signed;
     } catch (e) {
@@ -174,7 +174,8 @@ export async function verifyProof(
         reason: "页面显示的标题与签名时的标题不一致：数据库可能被改动",
       };
     }
-    if (expected.raw_text !== undefined && signed.raw_text !== expected.raw_text) {
+    const signedText = signed.raw_text ?? signed.summary;
+    if (expected.raw_text !== undefined && signedText !== undefined && signedText !== expected.raw_text) {
       return {
         ok: false,
         reason: "页面显示的正文与签名时的正文不一致：数据库可能被改动",
