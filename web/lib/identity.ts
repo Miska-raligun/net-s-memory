@@ -11,7 +11,7 @@
 //   localStorage  nsm_token  = JWT bearer
 //   sessionStorage nsm_seed  = hex seed, cleared when tab closes
 
-import sodium from "libsodium-wrappers";
+import sodium from "libsodium-wrappers-sumo";
 
 import { bytesToHex, canonicalEncode, hexToBytes } from "./canonical";
 

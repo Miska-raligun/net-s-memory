@@ -96,6 +96,8 @@ services:
       dockerfile: infra/Dockerfile.web
       args:
         NEXT_PUBLIC_API_BASE: ${PUBLIC_API_BASE:-http://localhost:8000}
+    environment:
+      INTERNAL_API_BASE: http://api:8000
     depends_on:
       api:
         condition: service_healthy

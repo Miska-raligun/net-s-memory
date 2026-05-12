@@ -16,7 +16,7 @@ from app.ingest.pipeline import ingest_candidates
 from app.ingest.sources.rsshub import RsshubSource
 
 SOURCES: dict[str, tuple[str, str]] = {
-    "zhihu": ("zhihu_hot", "https://rsshub.app/zhihu/hotlist"),
+    "zhihu": ("zhihu_daily", "https://feedx.net/rss/zhihudaily.xml"),
     "baidu": ("baidu_hot", "https://rsshub.app/baidu/realtime"),
     "weibo": ("weibo_hot", "https://rsshub.app/weibo/search/hot"),
 }
