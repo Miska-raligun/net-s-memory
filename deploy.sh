@@ -99,17 +99,22 @@ cat <<EOF
 
 Follow-up commands:
 
-  # 1. Pull a hot list into the candidate pool (no signing yet)
+  # PRIMARY: LLM actively searches the web for today's significant events
+  # (requires SEARCH_PROVIDER + LLM_API_KEY). Each event lands as a signed
+  # NewsItem with classification + summary + why_matters + ≥2 citations.
+  docker compose -f $COMPOSE_FILE --env-file $ENV_FILE \
+      exec api python -m app.discover.run
+
+  # FALLBACK 1: Pull hot lists into the candidate pool (no signing yet)
   docker compose -f $COMPOSE_FILE --env-file $ENV_FILE \
       exec api python -m app.ingest.run_once zhihu
 
-  # 2. Let the LLM curator decide which candidates are worth recording.
-  #    Promoted clusters become signed NewsItems on the public timeline;
-  #    rejected ones stay in /candidates with the LLM's reason.
+  # FALLBACK 2: Curate the candidate pool (alternative path when discover
+  # is offline or you want hot-list coverage too)
   docker compose -f $COMPOSE_FILE --env-file $ENV_FILE \
       exec api python -m app.curate.run
 
-  # 3. Cluster the curated NewsItems into multi-day events
+  # Cluster the resulting NewsItems into multi-day events
   docker compose -f $COMPOSE_FILE --env-file $ENV_FILE \
       exec api python -m app.events.run
 
