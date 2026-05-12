@@ -24,40 +24,38 @@ export default function EventsPage() {
   return (
     <main>
       <h1>多源印证的事件</h1>
-      <p style={{ fontSize: 14, color: "#555" }}>
-        当同一事件被 ≥3 个来源印证、或用户主动追踪时，
-        系统会把这些记录聚合成一条事件时间线。
-        点击进入的是该事件起点新闻，时间线 + 追踪后续 + 合入提案都在那一页。
+      <p className="desc-block">
+        当同一事件被多个来源印证或用户主动追踪时，系统将这些记录聚合为事件时间线。
       </p>
       {events.length === 0 ? (
-        <p>暂无聚合的事件。</p>
+        <div className="empty-state">暂无聚合事件</div>
       ) : (
-        <ul style={{ marginTop: 16, listStyle: "none", padding: 0 }}>
+        <div>
           {events.map((e) => {
             const href = e.origin_news_id
               ? `/news/${e.origin_news_id}`
               : `/events/${e.id}`;
             return (
-              <li
-                key={e.id}
-                style={{ borderBottom: "1px solid #eee", padding: "12px 0" }}
-              >
-                <Link href={href} style={{ fontSize: 16 }}>
+              <div key={e.id} className="news-item">
+                <Link href={href} className="news-title">
                   {e.title}
                 </Link>
-                <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
-                  {e.news_count} 条记录 · 状态 {e.status} · 最新更新{" "}
-                  {new Date(e.updated_at).toLocaleString("zh-CN")}
+                <div className="news-meta" style={{ marginTop: 6 }}>
+                  <span>{e.news_count} 条记录</span>
+                  <span>·</span>
+                  <span>{e.status}</span>
+                  <span>·</span>
+                  <span>
+                    {new Date(e.updated_at).toLocaleDateString("zh-CN")}
+                  </span>
                 </div>
                 {e.summary && (
-                  <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>
-                    {e.summary}
-                  </div>
+                  <div className="news-summary">{e.summary}</div>
                 )}
-              </li>
+              </div>
             );
           })}
-        </ul>
+        </div>
       )}
     </main>
   );

@@ -29,34 +29,34 @@ export default function LoginPage() {
   return (
     <main>
       <h1>登录</h1>
-      <form onSubmit={onSubmit} style={{ marginTop: 16, display: "grid", gap: 8 }}>
-        <label>
+      <form onSubmit={onSubmit} className="form-grid">
+        <label className="form-label">
           邮箱
           <input
             type="email"
+            className="form-input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
-            style={{ marginLeft: 8 }}
           />
         </label>
-        <label>
+        <label className="form-label">
           密码
           <input
             type="password"
+            className="form-input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
-            style={{ marginLeft: 8 }}
           />
         </label>
         <button type="submit" disabled={busy}>
           {busy ? "登录中…" : "登录"}
         </button>
       </form>
-      {err && <div className="fail" style={{ marginTop: 12 }}>{err}</div>}
+      {err && <div className="fail">{err}</div>}
     </main>
   );
 }

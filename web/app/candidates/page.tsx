@@ -13,7 +13,7 @@ const STATUSES: Array<"pending" | "curated" | "rejected"> = [
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "待策展",
-  curated: "已纳入记录",
+  curated: "已纳入",
   rejected: "已排除",
 };
 
@@ -43,67 +43,66 @@ export default function CandidatesPage() {
   return (
     <main>
       <h1>候选与策展记录</h1>
-      <p style={{ fontSize: 14, color: "#555" }}>
-        采集器把热榜原始条目作为<strong>候选</strong>写入，
-        LLM 策展人决定哪些值得纳入长期记录、哪些应当排除。
-        排除的条目带有 LLM 的理由说明，永久可查（虽然不签名上链）。
+      <p className="desc-block">
+        采集器将热榜条目写入候选池，LLM 策展人决定哪些值得纳入长期记录。
+        被排除的条目附有理由，永久可查。
       </p>
 
-      <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+      <div className="btn-group">
         {STATUSES.map((s) => (
           <button
             key={s}
+            className={status === s ? "btn-primary" : ""}
             onClick={() => setStatus(s)}
-            style={{
-              fontWeight: status === s ? 600 : 400,
-              background: status === s ? "#eef2ff" : "white",
-              border: "1px solid #ddd",
-              borderRadius: 4,
-              padding: "4px 10px",
-            }}
           >
             {STATUS_LABEL[s]}
           </button>
         ))}
       </div>
 
-      {err && <div className="fail" style={{ marginTop: 12 }}>{err}</div>}
+      {err && <div className="fail">{err}</div>}
       {rows.length === 0 && !err && (
-        <p style={{ marginTop: 16, color: "#888" }}>暂无{STATUS_LABEL[status]}的候选。</p>
+        <div className="empty-state">暂无{STATUS_LABEL[status]}的候选</div>
       )}
 
-      <ul style={{ listStyle: "none", paddingLeft: 0, marginTop: 16 }}>
+      <div>
         {rows.map((c) => (
-          <li
-            key={c.id}
-            style={{ padding: "10px 0", borderBottom: "1px solid #eee" }}
-          >
-            <div style={{ fontSize: 14 }}>
-              [<span style={{ color: "#888" }}>{c.source}</span>]{" "}
-              <a href={c.source_url} target="_blank" rel="noreferrer">
+          <div key={c.id} className="news-item">
+            <div>
+              <a
+                href={c.source_url}
+                target="_blank"
+                rel="noreferrer"
+                className="news-title"
+              >
                 {c.title}
               </a>
+              <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 8 }}>
+                {c.source}
+              </span>
             </div>
             {c.rejected_reason && (
-              <div style={{ fontSize: 12, color: "#b91c1c", marginTop: 2 }}>
-                排除理由: {c.rejected_reason}
+              <div style={{ fontSize: 12, color: "var(--red)", marginTop: 6, paddingLeft: 10, borderLeft: "2px solid var(--red)" }}>
+                {c.rejected_reason}
               </div>
             )}
             {c.news_item_id && (
-              <div style={{ fontSize: 12, marginTop: 2 }}>
-                已纳入 →{" "}
-                <Link href={`/news/${c.news_item_id}`}>查看正式记录</Link>
+              <div style={{ fontSize: 12, marginTop: 4 }}>
+                <Link href={`/news/${c.news_item_id}`}>查看正式记录 →</Link>
               </div>
             )}
-            <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
-              {new Date(c.fetched_at).toLocaleString("zh-CN")}
+            <div className="news-meta" style={{ marginTop: 6 }}>
+              <span>{new Date(c.fetched_at).toLocaleDateString("zh-CN")}</span>
               {c.decided_at && (
-                <> · 决定于 {new Date(c.decided_at).toLocaleString("zh-CN")}</>
+                <>
+                  <span>·</span>
+                  <span>决定于 {new Date(c.decided_at).toLocaleDateString("zh-CN")}</span>
+                </>
               )}
             </div>
-          </li>
+          </div>
         ))}
-      </ul>
+      </div>
     </main>
   );
 }

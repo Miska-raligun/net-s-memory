@@ -17,23 +17,18 @@ export default function Nav() {
   }, []);
 
   return (
-    <nav
-      style={{
-        display: "flex",
-        gap: 16,
-        padding: "8px 16px",
-        borderBottom: "1px solid #ddd",
-        alignItems: "center",
-      }}
-    >
-      <Link href="/">首页</Link>
+    <nav className="site-nav">
+      <Link href="/" className="nav-brand">
+        net-s-memory
+      </Link>
+      <Link href="/">记录</Link>
       <Link href="/events">事件</Link>
       <Link href="/candidates">候选</Link>
       <Link href="/transparency">透明度</Link>
-      <span style={{ flex: 1 }} />
+      <span className="nav-spacer" />
       {user ? (
         <>
-          <span style={{ fontSize: 14, color: "#444" }}>
+          <span className="nav-user">
             {user.email} · 信誉 {user.reputation.toFixed(1)}
           </span>
           <button

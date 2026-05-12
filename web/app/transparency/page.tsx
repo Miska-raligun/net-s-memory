@@ -25,10 +25,9 @@ export default async function TransparencyPage() {
   return (
     <main>
       <h1>公开透明日志</h1>
-      <p>追加式 Merkle 日志当前规模：<strong>{t.tree_size}</strong> 条叶子。</p>
-      <p>
-        当前根哈希：
-        <code>{t.root_hash ?? "(尚无叶子)"}</code>
+      <p className="desc-block">
+        追加式 Merkle 日志当前规模：<strong style={{ color: "var(--text)" }}>{t.tree_size}</strong> 条叶子。
+        当前根哈希：<code>{t.root_hash ?? "(尚无叶子)"}</code>
       </p>
 
       <h2>历史锚定</h2>
