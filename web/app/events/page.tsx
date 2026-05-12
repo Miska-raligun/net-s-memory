@@ -23,33 +23,40 @@ export default function EventsPage() {
 
   return (
     <main>
-      <h1>事件时间线</h1>
+      <h1>多源印证的事件</h1>
       <p style={{ fontSize: 14, color: "#555" }}>
-        当同一事件在 ≥ 3 个来源被报道时会自动归档为一个事件，后续新报道按时间顺序续接。
+        当同一事件被 ≥3 个来源印证、或用户主动追踪时，
+        系统会把这些记录聚合成一条事件时间线。
+        点击进入的是该事件起点新闻，时间线 + 追踪后续 + 合入提案都在那一页。
       </p>
       {events.length === 0 ? (
         <p>暂无聚合的事件。</p>
       ) : (
         <ul style={{ marginTop: 16, listStyle: "none", padding: 0 }}>
-          {events.map((e) => (
-            <li
-              key={e.id}
-              style={{ borderBottom: "1px solid #eee", padding: "12px 0" }}
-            >
-              <Link href={`/events/${e.id}`} style={{ fontSize: 16 }}>
-                {e.title}
-              </Link>
-              <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
-                {e.news_count} 条记录 · 状态 {e.status} · 最新更新{" "}
-                {new Date(e.updated_at).toLocaleString("zh-CN")}
-              </div>
-              {e.summary && (
-                <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>
-                  {e.summary}
+          {events.map((e) => {
+            const href = e.origin_news_id
+              ? `/news/${e.origin_news_id}`
+              : `/events/${e.id}`;
+            return (
+              <li
+                key={e.id}
+                style={{ borderBottom: "1px solid #eee", padding: "12px 0" }}
+              >
+                <Link href={href} style={{ fontSize: 16 }}>
+                  {e.title}
+                </Link>
+                <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
+                  {e.news_count} 条记录 · 状态 {e.status} · 最新更新{" "}
+                  {new Date(e.updated_at).toLocaleString("zh-CN")}
                 </div>
-              )}
-            </li>
-          ))}
+                {e.summary && (
+                  <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>
+                    {e.summary}
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </main>

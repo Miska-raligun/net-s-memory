@@ -7,8 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import CurrentUser
 from app.db.models import MerkleLeaf, NewsItem, NewsSignature
 from app.db.session import get_session
+from app.events.cluster import ensure_event_for_news, event_for_news
 from app.log_state import load_log_state
 
 router = APIRouter(prefix="/api/news", tags=["news"])
@@ -55,6 +57,7 @@ async def get_news(news_id: uuid.UUID, session: SessionDep) -> dict:
     ).scalar_one_or_none()
     if item is None:
         raise HTTPException(status_code=404, detail="news not found")
+    event_id = await event_for_news(session, news_id)
     return {
         "id": str(item.id),
         "source": item.source,
@@ -70,7 +73,26 @@ async def get_news(news_id: uuid.UUID, session: SessionDep) -> dict:
         "why_matters": item.why_matters,
         "citations": item.citations or [],
         "curator": item.curator,
+        "event_id": str(event_id) if event_id else None,
     }
+
+
+@router.post("/{news_id}/ensure-event")
+async def post_ensure_event(
+    news_id: uuid.UUID,
+    user: CurrentUser,
+    session: SessionDep,
+) -> dict:
+    """Return the event_id for this news, creating a singleton event
+    if there isn't one yet. Used by the news detail page so a user can
+    track follow-ups even on an isolated record. Requires auth so the
+    creation is attributable to a request."""
+    _ = user  # auth gate; we don't persist requester here
+    try:
+        event_id = await ensure_event_for_news(session, news_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e)) from e
+    return {"event_id": str(event_id)}
 
 
 @router.get("/{news_id}/proof")

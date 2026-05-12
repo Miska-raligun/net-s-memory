@@ -26,6 +26,7 @@ export interface NewsDetail extends NewsListItem {
   raw_text: string;
   source_id: string | null;
   citations: NewsCitation[];
+  event_id: string | null;
 }
 
 export interface CandidateItem {
@@ -82,6 +83,7 @@ export interface EventListItem {
   title: string;
   summary: string;
   status: string;
+  origin_news_id: string | null;
   news_count: number;
   created_at: string;
   updated_at: string;

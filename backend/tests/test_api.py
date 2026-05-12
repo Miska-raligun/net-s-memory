@@ -104,3 +104,58 @@ async def test_transparency_reflects_log_state(
     assert body1["tree_size"] == 3
     assert body1["root_hash"] is not None
     assert len(body1["root_hash"]) == 64
+
+
+@pytest.mark.asyncio
+async def test_news_detail_includes_event_id_null_when_no_event(
+    session: AsyncSession, client: AsyncClient
+) -> None:
+    key = SigningKey.generate()
+    await seed_news(session, [_draft("a", "孤立")], key)
+    nid = (await client.get("/api/news")).json()[0]["id"]
+    body = (await client.get(f"/api/news/{nid}")).json()
+    assert body["event_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_ensure_event_creates_singleton_via_api(
+    session: AsyncSession, client: AsyncClient
+) -> None:
+    key = SigningKey.generate()
+    await seed_news(session, [_draft("a", "孤立")], key)
+    nid = (await client.get("/api/news")).json()[0]["id"]
+
+    user_key = SigningKey.generate()
+    r = await client.post(
+        "/api/auth/signup",
+        json={
+            "email": "ensure@example.com",
+            "password": "supersecret123",
+            "pubkey": bytes(user_key.verify_key).hex(),
+        },
+    )
+    token = r.json()["token"]
+
+    # Without auth: 401.
+    r_no_auth = await client.post(f"/api/news/{nid}/ensure-event")
+    assert r_no_auth.status_code == 401
+
+    # With auth: creates the singleton event and returns its id.
+    r_ok = await client.post(
+        f"/api/news/{nid}/ensure-event",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r_ok.status_code == 200
+    event_id = r_ok.json()["event_id"]
+    assert event_id
+
+    # GET /api/news/{id} now reflects the new event_id.
+    body = (await client.get(f"/api/news/{nid}")).json()
+    assert body["event_id"] == event_id
+
+    # Idempotent: second call returns the same id.
+    r_again = await client.post(
+        f"/api/news/{nid}/ensure-event",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r_again.json()["event_id"] == event_id

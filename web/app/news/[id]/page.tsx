@@ -1,9 +1,20 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { API_BASE, type Analysis, type NewsDetail } from "@/lib/api";
+import {
+  API_BASE,
+  type Analysis,
+  type EventDetail,
+  type FollowupDevelopment,
+  type FollowupRecord,
+  type MergeProposal,
+  type NewsDetail,
+} from "@/lib/api";
+import { authHeader } from "@/lib/auth";
 import { getUser } from "@/lib/identity";
+import { listEventProposals, submitProposal } from "@/lib/proposals";
 import { type ProofResponse, type VerificationStatus, verifyProof } from "@/lib/verify";
 import {
   type MyVote,
@@ -25,6 +36,28 @@ export default function NewsPage({ params }: { params: { id: string } }) {
   const [myVote, setMyVote] = useState<MyVote | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
   const [voting, setVoting] = useState(false);
+  const [event, setEvent] = useState<EventDetail | null>(null);
+  const [followup, setFollowup] = useState<FollowupRecord | null>(null);
+  const [followupError, setFollowupError] = useState<string | null>(null);
+  const [tracking, setTracking] = useState(false);
+  const [proposals, setProposals] = useState<MergeProposal[]>([]);
+
+  async function loadEventChain(eventId: string) {
+    const [evtR, fuR] = await Promise.all([
+      fetch(`${API_BASE}/api/events/${eventId}`),
+      fetch(`${API_BASE}/api/events/${eventId}/followup/latest`),
+    ]);
+    if (evtR.ok) setEvent(await evtR.json());
+    if (fuR.ok) {
+      const d = await fuR.json();
+      if (d) setFollowup(d);
+    }
+    listEventProposals(eventId)
+      .then(setProposals)
+      .catch(() => {
+        /* optional */
+      });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -34,39 +67,29 @@ export default function NewsPage({ params }: { params: { id: string } }) {
         return r.json();
       })
       .then((d: NewsDetail) => {
-        if (!cancelled) setNews(d);
+        if (cancelled) return;
+        setNews(d);
+        if (d.event_id) loadEventChain(d.event_id);
       })
-      .catch((e: Error) => {
-        if (!cancelled) setLoadError(e.message);
-      });
+      .catch((e: Error) => !cancelled && setLoadError(e.message));
 
     fetch(`${API_BASE}/api/news/${params.id}/analysis`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d: Analysis | null) => {
         if (!cancelled && d) setAnalysis(d);
       })
-      .catch(() => {
-        /* analysis is optional */
-      });
+      .catch(() => undefined);
 
     fetchAggregate(params.id)
-      .then((a) => {
-        if (!cancelled) setAggregate(a);
-      })
-      .catch(() => {
-        /* ignore */
-      });
+      .then((a) => !cancelled && setAggregate(a))
+      .catch(() => undefined);
     fetchMyVote(params.id)
-      .then((v) => {
-        if (!cancelled) setMyVote(v);
-      })
-      .catch(() => {
-        /* ignore */
-      });
-
+      .then((v) => !cancelled && setMyVote(v))
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
   async function onVote(score: number) {
@@ -125,8 +148,47 @@ export default function NewsPage({ params }: { params: { id: string } }) {
     }
   }
 
+  async function onTrackFollowup() {
+    if (!news) return;
+    setTracking(true);
+    setFollowupError(null);
+    try {
+      let eid = news.event_id;
+      if (!eid) {
+        const r = await fetch(`${API_BASE}/api/news/${params.id}/ensure-event`, {
+          method: "POST",
+          headers: authHeader(),
+        });
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          setFollowupError(`建立时间线失败 (${r.status}): ${body.detail ?? r.statusText}`);
+          return;
+        }
+        eid = (await r.json()).event_id as string;
+        setNews({ ...news, event_id: eid });
+      }
+      const fu = await fetch(`${API_BASE}/api/events/${eid}/followup`, {
+        method: "POST",
+        headers: authHeader(),
+      });
+      if (!fu.ok) {
+        const body = await fu.json().catch(() => ({}));
+        setFollowupError(`追踪失败 (${fu.status}): ${body.detail ?? fu.statusText}`);
+        return;
+      }
+      setFollowup(await fu.json());
+      await loadEventChain(eid);
+    } catch (e) {
+      setFollowupError((e as Error).message);
+    } finally {
+      setTracking(false);
+    }
+  }
+
   if (loadError) return <main><div className="fail">加载失败：{loadError}</div></main>;
   if (!news) return <main><p>加载中…</p></main>;
+
+  const user = getUser();
 
   return (
     <main>
@@ -227,6 +289,99 @@ export default function NewsPage({ params }: { params: { id: string } }) {
           </div>
         )}
       </section>
+
+      <section style={{ marginTop: 24 }}>
+        <h2>事件时间线</h2>
+        {!event && (
+          <p style={{ fontSize: 13, color: "#888" }}>
+            目前还没有其他来源印证这条记录。
+            点击下方"追踪后续"会为它建立独立时间线，
+            未来再有同事件报道会被自动接续上来。
+          </p>
+        )}
+        {event && (
+          <ol style={{ marginTop: 8, paddingLeft: 24 }}>
+            {event.timeline.map((entry) => {
+              const isSelf = entry.news.id === news.id;
+              return (
+                <li
+                  key={entry.news.id}
+                  style={{
+                    marginBottom: 12,
+                    fontWeight: isSelf ? 600 : 400,
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: "#888" }}>
+                    [{entry.kind}]{" "}
+                    {new Date(entry.news.fetched_at).toLocaleString("zh-CN")}
+                    {" · "}
+                    {entry.news.source}
+                  </div>
+                  {isSelf ? (
+                    <span style={{ fontSize: 14 }}>
+                      {entry.news.title} <em style={{ color: "#6366f1" }}>(本条)</em>
+                    </span>
+                  ) : (
+                    <Link href={`/news/${entry.news.id}`} style={{ fontSize: 14 }}>
+                      {entry.news.title}
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </section>
+
+      <section style={{ marginTop: 24 }}>
+        <h2>追踪后续</h2>
+        <p style={{ fontSize: 13, color: "#555" }}>
+          让 AI 通过网络搜索整理本事件的后续发展。结果**仅展示给你**，
+          不会写入公开时间线、也不会上链；你可以勾选可信的进展发起合入提案，
+          通过社区表决后才会作为新条目加入时间线并签名上链。
+        </p>
+        {!user && (
+          <p style={{ fontSize: 13, color: "#888" }}>登录后可发起追踪。</p>
+        )}
+        <button
+          onClick={onTrackFollowup}
+          disabled={!user || tracking}
+          style={{ marginTop: 8 }}
+        >
+          {tracking
+            ? "搜索中…"
+            : followup
+            ? "重新追踪后续"
+            : news.event_id
+            ? "追踪后续"
+            : "建立时间线并追踪后续"}
+        </button>
+        {followupError && (
+          <div className="fail" style={{ marginTop: 8 }}>{followupError}</div>
+        )}
+        {followup && (
+          <FollowupCard
+            record={followup}
+            onProposed={(p) => setProposals((prev) => [p, ...prev])}
+          />
+        )}
+
+        {proposals.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <h3>已发起的合入提案</h3>
+            <ul>
+              {proposals.map((p) => (
+                <li key={p.id}>
+                  <Link href={`/merge-proposals/${p.id}`}>
+                    [{p.status}]{" "}
+                    {p.selected_developments.map((d) => d.summary).join("; ")}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
     </main>
   );
 }
@@ -277,15 +432,9 @@ function VoteCard({
         </p>
       ) : (
         <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-          <button onClick={() => onVote(1)} disabled={voting}>
-            👍 支持
-          </button>
-          <button onClick={() => onVote(0)} disabled={voting}>
-            😐 中立
-          </button>
-          <button onClick={() => onVote(-1)} disabled={voting}>
-            👎 质疑
-          </button>
+          <button onClick={() => onVote(1)} disabled={voting}>👍 支持</button>
+          <button onClick={() => onVote(0)} disabled={voting}>😐 中立</button>
+          <button onClick={() => onVote(-1)} disabled={voting}>👎 质疑</button>
         </div>
       )}
       {error && <div className="fail" style={{ marginTop: 8 }}>{error}</div>}
@@ -340,6 +489,138 @@ function CredibilityCard({ analysis }: { analysis: Analysis }) {
       <p style={{ fontSize: 12, color: "#888", marginTop: 8 }}>
         此评分为可信度信号的加权汇总，不构成对事件真伪的最终判定。
       </p>
+    </div>
+  );
+}
+
+function FollowupCard({
+  record,
+  onProposed,
+}: {
+  record: FollowupRecord;
+  onProposed: (p: MergeProposal) => void;
+}) {
+  const p = record.payload;
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [submitting, setSubmitting] = useState(false);
+  const [proposeError, setProposeError] = useState<string | null>(null);
+  const user = getUser();
+
+  function toggle(i: number) {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  }
+
+  async function onPropose() {
+    setSubmitting(true);
+    setProposeError(null);
+    try {
+      const devs: FollowupDevelopment[] = Array.from(selected)
+        .sort((a, b) => a - b)
+        .map((i) => p.developments[i]);
+      const result = await submitProposal(record.event_id, record.id, devs);
+      onProposed(result);
+      setSelected(new Set());
+    } catch (e) {
+      setProposeError((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        border: "1px dashed #aaa",
+        borderRadius: 6,
+        padding: 12,
+        background: "#fafafa",
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#888" }}>
+        草稿 · {new Date(record.generated_at).toLocaleString("zh-CN")} ·
+        来源 {record.search_provider} · 模型 {record.model} ·
+        建议状态 {p.status_suggestion}
+      </div>
+
+      <h3 style={{ marginTop: 12 }}>检索到的进展</h3>
+      {p.developments.length === 0 ? (
+        <p style={{ fontSize: 13, color: "#888" }}>未发现满足 ≥2 来源的进展。</p>
+      ) : (
+        <>
+          <p style={{ fontSize: 12, color: "#888" }}>
+            勾选你认为可信的进展，发起合入提案后由社区表决，通过后写入时间线并上链。
+          </p>
+          <ul style={{ listStyle: "none", paddingLeft: 0 }}>
+            {p.developments.map((d, i) => (
+              <li key={i} style={{ marginBottom: 8 }}>
+                <label style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(i)}
+                    onChange={() => toggle(i)}
+                    disabled={!user}
+                  />
+                  <div>
+                    <div style={{ fontSize: 14 }}>
+                      [{d.date}] {d.summary}
+                      <span style={{ marginLeft: 6, color: "#888", fontSize: 12 }}>
+                        ({d.source_count} 来源)
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12 }}>
+                      {d.citations.map((c, j) => (
+                        <span key={j} style={{ marginRight: 8 }}>
+                          <a href={c} target="_blank" rel="noreferrer">[{j + 1}]</a>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </label>
+              </li>
+            ))}
+          </ul>
+          {user && (
+            <button
+              onClick={onPropose}
+              disabled={submitting || selected.size === 0}
+              style={{ marginTop: 8 }}
+            >
+              {submitting ? "提交中…" : `发起合入提案（${selected.size} 项）`}
+            </button>
+          )}
+          {proposeError && (
+            <div className="fail" style={{ marginTop: 8 }}>{proposeError}</div>
+          )}
+        </>
+      )}
+
+      {p.leads.length > 0 && (
+        <>
+          <h3 style={{ marginTop: 12 }}>线索（孤证 / 未达 2 来源）</h3>
+          <ul style={{ fontSize: 13, color: "#666" }}>
+            {p.leads.map((l, i) => (
+              <li key={i}>{l}</li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {p.still_unanswered.length > 0 && (
+        <>
+          <h3 style={{ marginTop: 12 }}>仍未回答的问题</h3>
+          <ul style={{ fontSize: 13 }}>
+            {p.still_unanswered.map((q, i) => (
+              <li key={i}>{q}</li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

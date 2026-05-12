@@ -55,6 +55,54 @@ async def _next_position(session: AsyncSession, event_id: uuid.UUID) -> int:
     return int(cur) + 1
 
 
+async def event_for_news(
+    session: AsyncSession, news_id: uuid.UUID
+) -> uuid.UUID | None:
+    """Return the event a news item already belongs to, or None."""
+    return (
+        await session.execute(
+            select(EventNews.event_id).where(EventNews.news_id == news_id).limit(1)
+        )
+    ).scalar_one_or_none()
+
+
+async def ensure_event_for_news(
+    session: AsyncSession, news_id: uuid.UUID
+) -> uuid.UUID:
+    """Return the existing event id for a news item, creating a singleton
+    event if none yet. Singletons are the "this story isn't yet
+    corroborated by other sources, but the user wants a timeline to hang
+    follow-ups off of" case. The next time the clusterer runs and finds
+    same-event reports from other sources, those will attach onto this
+    same event as kind='update'."""
+    existing = await event_for_news(session, news_id)
+    if existing is not None:
+        return existing
+
+    news = await session.get(NewsItem, news_id)
+    if news is None:
+        raise ValueError(f"news {news_id} not found")
+
+    fetched_at = _aware(news.fetched_at)
+    event_id = uuid.uuid4()
+    event = Event(
+        id=event_id,
+        slug=_slug_for(news.title, str(event_id)[:8]),
+        title=news.title,
+        summary=news.summary or "",
+        status="ongoing",
+        created_at=fetched_at,
+        updated_at=fetched_at,
+    )
+    session.add(event)
+    await session.flush()
+    session.add(
+        EventNews(event_id=event_id, news_id=news_id, kind="origin", position=0)
+    )
+    await session.commit()
+    return event_id
+
+
 async def _attached_event_for(
     session: AsyncSession, news_ids: Iterable[uuid.UUID]
 ) -> uuid.UUID | None:

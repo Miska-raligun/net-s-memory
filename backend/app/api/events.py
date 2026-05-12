@@ -32,19 +32,31 @@ async def list_events(
             .offset(offset)
         )
     ).all()
-    return [
-        {
-            "id": str(e.id),
-            "slug": e.slug,
-            "title": e.title,
-            "summary": e.summary,
-            "status": e.status,
-            "news_count": int(c),
-            "created_at": e.created_at.isoformat(),
-            "updated_at": e.updated_at.isoformat(),
-        }
-        for e, c in rows
-    ]
+
+    out: list[dict[str, Any]] = []
+    for e, c in rows:
+        origin = (
+            await session.execute(
+                select(EventNews.news_id)
+                .where(EventNews.event_id == e.id)
+                .order_by(EventNews.position.asc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        out.append(
+            {
+                "id": str(e.id),
+                "slug": e.slug,
+                "title": e.title,
+                "summary": e.summary,
+                "status": e.status,
+                "news_count": int(c),
+                "created_at": e.created_at.isoformat(),
+                "updated_at": e.updated_at.isoformat(),
+                "origin_news_id": str(origin) if origin else None,
+            }
+        )
+    return out
 
 
 @router.get("/{event_id}")

@@ -9,7 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Event, EventNews, NewsItem
-from app.events.cluster import cluster_all_unassigned, cluster_one
+from app.events.cluster import (
+    cluster_all_unassigned,
+    cluster_one,
+    ensure_event_for_news,
+    event_for_news,
+)
 
 
 async def _add(
@@ -151,3 +156,52 @@ async def test_events_api(session: AsyncSession, client: AsyncClient) -> None:
 
     r_404 = await client.get(f"/api/events/{uuid.uuid4()}")
     assert r_404.status_code == 404
+
+    # Events list now exposes the origin so the UI can link straight to news.
+    assert body[0]["origin_news_id"] in {str(i.id) for i in items}
+
+
+@pytest.mark.asyncio
+async def test_ensure_event_returns_existing(session: AsyncSession) -> None:
+    now = datetime.now(UTC)
+    a = await _add(session, source="zhihu_hot", title="化工厂事故首发", fetched_at=now)
+    await _add(session, source="weibo_hot", title="化工厂事故首发 现场", fetched_at=now)
+    await _add(session, source="baidu_hot", title="化工厂事故首发 暂无伤亡", fetched_at=now)
+    event_id = await cluster_one(session, a.id)
+    assert event_id is not None
+
+    same = await ensure_event_for_news(session, a.id)
+    assert same == event_id
+
+
+@pytest.mark.asyncio
+async def test_ensure_event_creates_singleton_for_isolated_news(
+    session: AsyncSession,
+) -> None:
+    now = datetime.now(UTC)
+    lonely = await _add(
+        session, source="discover", title="孤立条目无同源印证", fetched_at=now
+    )
+    assert (await event_for_news(session, lonely.id)) is None
+
+    event_id = await ensure_event_for_news(session, lonely.id)
+    assert event_id is not None
+
+    # Calling again is a no-op (returns the same id).
+    again = await ensure_event_for_news(session, lonely.id)
+    assert again == event_id
+
+    rows = (
+        await session.execute(
+            select(EventNews).where(EventNews.event_id == event_id)
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].kind == "origin"
+    assert rows[0].news_id == lonely.id
+
+
+@pytest.mark.asyncio
+async def test_ensure_event_unknown_news_raises(session: AsyncSession) -> None:
+    with pytest.raises(ValueError, match="not found"):
+        await ensure_event_for_news(session, uuid.uuid4())
