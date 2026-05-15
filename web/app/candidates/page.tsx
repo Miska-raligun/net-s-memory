@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import Loading from "@/components/Loading";
 import { API_BASE, type CandidateItem } from "@/lib/api";
+import { relativeTime } from "@/lib/time";
 
 const STATUSES: Array<"pending" | "curated" | "rejected"> = [
   "pending",
@@ -24,8 +26,11 @@ export default function CandidatesPage() {
   const [rows, setRows] = useState<CandidateItem[]>([]);
   const [err, setErr] = useState<string | null>(null);
 
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     fetch(`${API_BASE}/api/candidates?status=${status}&limit=100`)
       .then((r) => {
         if (!r.ok) throw new Error(`load failed: ${r.status}`);
@@ -34,7 +39,8 @@ export default function CandidatesPage() {
       .then((d: CandidateItem[]) => {
         if (!cancelled) setRows(d);
       })
-      .catch((e: Error) => !cancelled && setErr(e.message));
+      .catch((e: Error) => !cancelled && setErr(e.message))
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => {
       cancelled = true;
     };
@@ -61,7 +67,8 @@ export default function CandidatesPage() {
       </div>
 
       {err && <div className="fail">{err}</div>}
-      {rows.length === 0 && !err && (
+      {loading && <Loading />}
+      {!loading && rows.length === 0 && !err && (
         <div className="empty-state">暂无{STATUS_LABEL[status]}的候选</div>
       )}
 
@@ -92,11 +99,13 @@ export default function CandidatesPage() {
               </div>
             )}
             <div className="news-meta" style={{ marginTop: 6 }}>
-              <span>{new Date(c.fetched_at).toLocaleDateString("zh-CN")}</span>
+              <span title={new Date(c.fetched_at).toLocaleString("zh-CN")}>
+                {relativeTime(c.fetched_at)}
+              </span>
               {c.decided_at && (
                 <>
                   <span>·</span>
-                  <span>决定于 {new Date(c.decided_at).toLocaleDateString("zh-CN")}</span>
+                  <span>决定于 {relativeTime(c.decided_at)}</span>
                 </>
               )}
             </div>

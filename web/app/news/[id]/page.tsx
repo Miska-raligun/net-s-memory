@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import Loading from "@/components/Loading";
 import {
   API_BASE,
   type Analysis,
@@ -15,6 +16,7 @@ import {
 import { authHeader } from "@/lib/auth";
 import { getUser } from "@/lib/identity";
 import { listEventProposals, submitProposal } from "@/lib/proposals";
+import { formatDateTime } from "@/lib/time";
 import { type ProofResponse, type VerificationStatus, verifyProof } from "@/lib/verify";
 import {
   type MyVote,
@@ -184,7 +186,7 @@ export default function NewsPage({ params }: { params: { id: string } }) {
   }
 
   if (loadError) return <main><div className="fail">加载失败：{loadError}</div></main>;
-  if (!news) return <main><p>加载中…</p></main>;
+  if (!news) return <main><Loading /></main>;
 
   const user = getUser();
 
@@ -210,7 +212,7 @@ export default function NewsPage({ params }: { params: { id: string } }) {
         <a href={news.source_url} target="_blank" rel="noreferrer">
           {news.source}
         </a>
-        {" · "}采集时间 {new Date(news.fetched_at).toLocaleString("zh-CN")}
+        {" · "}采集时间 {formatDateTime(news.fetched_at)}
       </p>
       {news.citations && news.citations.length > 1 && (
         <details>
@@ -295,7 +297,7 @@ export default function NewsPage({ params }: { params: { id: string } }) {
                 >
                   <div className="timeline-kind">
                     [{entry.kind}]{" "}
-                    {new Date(entry.news.fetched_at).toLocaleString("zh-CN")}
+                    {formatDateTime(entry.news.fetched_at)}
                     {" · "}
                     {entry.news.source}
                   </div>
@@ -502,7 +504,7 @@ function FollowupCard({
   return (
     <div className="info-card-dashed">
       <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-        草稿 · {new Date(record.generated_at).toLocaleString("zh-CN")} ·
+        草稿 · {formatDateTime(record.generated_at)} ·
         来源 {record.search_provider} · 模型 {record.model} ·
         建议状态 {p.status_suggestion}
       </div>

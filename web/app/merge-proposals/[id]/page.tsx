@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import Loading from "@/components/Loading";
 import type { MergeProposalDetail } from "@/lib/api";
 import { getUser } from "@/lib/identity";
 import { fetchProposal, voteOnProposal } from "@/lib/proposals";
+import { formatDateTime } from "@/lib/time";
 
 export default function ProposalPage({ params }: { params: { id: string } }) {
   const [p, setP] = useState<MergeProposalDetail | null>(null);
@@ -40,7 +42,7 @@ export default function ProposalPage({ params }: { params: { id: string } }) {
   }
 
   if (error) return <main><div className="fail">加载失败：{error}</div></main>;
-  if (!p) return <main><p>加载中…</p></main>;
+  if (!p) return <main><Loading /></main>;
 
   const user = getUser();
 
@@ -49,10 +51,10 @@ export default function ProposalPage({ params }: { params: { id: string } }) {
       <h1>合入提案</h1>
       <div className="detail-meta">
         事件：<Link href={`/events/${p.event_id}`}>{p.event_id}</Link> ·
-        发起时间 {new Date(p.proposed_at).toLocaleString("zh-CN")} ·
+        发起时间 {formatDateTime(p.proposed_at)} ·
         状态 <strong style={{ color: "var(--text)" }}>{p.status}</strong>
         {p.decided_at && (
-          <> · 决定于 {new Date(p.decided_at).toLocaleString("zh-CN")}</>
+          <> · 决定于 {formatDateTime(p.decided_at)}</>
         )}
       </div>
 

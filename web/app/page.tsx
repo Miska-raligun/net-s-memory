@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { API_BASE, type NewsListItem } from "@/lib/api";
+import { relativeTime } from "@/lib/time";
 
 async function fetchNews(): Promise<NewsListItem[]> {
   const r = await fetch(`${API_BASE}/api/news`, { cache: "no-store" });
@@ -22,6 +23,13 @@ function ClassBadge({ cls }: { cls: string | null }) {
   if (!cls) return null;
   const label = CLASS_LABELS[cls] ?? cls;
   return <span className={`badge badge-${cls}`}>{label}</span>;
+}
+
+function formatCurator(curator: string | null, source: string): string {
+  if (!curator) return source;
+  const cleaned = curator.replace(/^discover:/, "");
+  const parts = cleaned.split("/");
+  return parts.length > 1 ? parts[parts.length - 1] : cleaned;
 }
 
 export default async function HomePage() {
@@ -62,9 +70,11 @@ export default async function HomePage() {
               <div className="news-why">{n.why_matters}</div>
             )}
             <div className="news-meta">
-              <span>{new Date(n.fetched_at).toLocaleDateString("zh-CN")}</span>
+              <span title={new Date(n.fetched_at).toLocaleString("zh-CN")}>
+                {relativeTime(n.fetched_at)}
+              </span>
               <span>·</span>
-              <span>{n.curator ? n.curator.replace(/^discover:/, "") : n.source}</span>
+              <span>{formatCurator(n.curator, n.source)}</span>
             </div>
           </div>
         ))}
