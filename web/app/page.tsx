@@ -1,12 +1,23 @@
 import Link from "next/link";
 
-import { API_BASE, type NewsListItem } from "@/lib/api";
+import { API_BASE, type NewsListItem, type Transparency } from "@/lib/api";
 import { relativeTime } from "@/lib/time";
 
 async function fetchNews(): Promise<NewsListItem[]> {
   const r = await fetch(`${API_BASE}/api/news`, { cache: "no-store" });
   if (!r.ok) throw new Error(`failed to fetch news: ${r.status}`);
   return r.json();
+}
+
+async function fetchStats(): Promise<{ treeSize: number } | null> {
+  try {
+    const r = await fetch(`${API_BASE}/api/transparency`, { cache: "no-store" });
+    if (!r.ok) return null;
+    const t: Transparency = await r.json();
+    return { treeSize: t.tree_size };
+  } catch {
+    return null;
+  }
 }
 
 const CLASS_LABELS: Record<string, string> = {
@@ -33,13 +44,14 @@ function formatCurator(curator: string | null, source: string): string {
 }
 
 export default async function HomePage() {
-  let news: NewsListItem[] = [];
-  let error: string | null = null;
-  try {
-    news = await fetchNews();
-  } catch (e) {
-    error = (e as Error).message;
-  }
+  const [newsResult, stats] = await Promise.all([
+    fetchNews().catch((e: Error) => e),
+    fetchStats(),
+  ]);
+
+  const isError = newsResult instanceof Error;
+  const news = isError ? [] : newsResult;
+  const error = isError ? newsResult.message : null;
 
   return (
     <main>
@@ -48,6 +60,20 @@ export default async function HomePage() {
         每条记录在入库时由服务端 Ed25519 密钥签名并写入追加式 Merkle
         日志。筛选标准：三个月后可能被删除或篡改的争议性事件。
       </p>
+
+      {stats && (
+        <div className="stats-bar">
+          <div className="stat">
+            <span className="stat-value">{news.length}</span>
+            <span className="stat-label">条记录</span>
+          </div>
+          <div className="stat">
+            <span className="stat-value">{stats.treeSize}</span>
+            <span className="stat-label">Merkle 叶子</span>
+          </div>
+        </div>
+      )}
+
       {error && <div className="fail">无法连接后端 API：{error}</div>}
       {news.length === 0 && !error && (
         <div className="empty-state">

@@ -185,6 +185,10 @@ export default function NewsPage({ params }: { params: { id: string } }) {
     }
   }
 
+  useEffect(() => {
+    if (news) document.title = `${news.title} · 互联网记忆`;
+  }, [news]);
+
   if (loadError) return <main><div className="fail">加载失败：{loadError}</div></main>;
   if (!news) return <main><Loading /></main>;
 
