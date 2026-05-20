@@ -3,34 +3,35 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import Loading from "@/components/Loading";
+import FilterChips, { type ChipOption } from "@/components/FilterChips";
+import SkeletonFeed from "@/components/SkeletonFeed";
 import { API_BASE, type CandidateItem } from "@/lib/api";
 import { relativeTime } from "@/lib/time";
 
-const STATUSES: Array<"pending" | "curated" | "rejected"> = [
-  "pending",
-  "curated",
-  "rejected",
-];
+type Status = "pending" | "curated" | "rejected";
 
-const STATUS_LABEL: Record<string, string> = {
+const STATUS_LABEL: Record<Status, string> = {
   pending: "待策展",
   curated: "已纳入",
   rejected: "已排除",
 };
 
+const STATUS_TABS: ChipOption[] = [
+  { value: "rejected", label: "已排除" },
+  { value: "curated", label: "已纳入" },
+  { value: "pending", label: "待策展" },
+];
+
 export default function CandidatesPage() {
-  const [status, setStatus] = useState<"pending" | "curated" | "rejected">(
-    "rejected",
-  );
+  const [status, setStatus] = useState<Status>("rejected");
   const [rows, setRows] = useState<CandidateItem[]>([]);
   const [err, setErr] = useState<string | null>(null);
-
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setErr(null);
     fetch(`${API_BASE}/api/candidates?status=${status}&limit=100`)
       .then((r) => {
         if (!r.ok) throw new Error(`load failed: ${r.status}`);
@@ -40,7 +41,9 @@ export default function CandidatesPage() {
         if (!cancelled) setRows(d);
       })
       .catch((e: Error) => !cancelled && setErr(e.message))
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -50,24 +53,19 @@ export default function CandidatesPage() {
     <main>
       <h1>候选与策展记录</h1>
       <p className="desc-block">
-        采集器将热榜条目写入候选池，LLM 策展人决定哪些值得纳入长期记录。
-        被排除的条目附有理由，永久可查。
+        采集器把热榜原始条目写入<strong>候选池</strong>，LLM 策展人决定是否纳入长期记录。
+        被排除的条目附有理由，永久可查（不签名上链）。
+        这一页就是策展决策的<strong>公开审计入口</strong>。
       </p>
 
-      <div className="btn-group">
-        {STATUSES.map((s) => (
-          <button
-            key={s}
-            className={status === s ? "btn-primary" : ""}
-            onClick={() => setStatus(s)}
-          >
-            {STATUS_LABEL[s]}
-          </button>
-        ))}
-      </div>
+      <FilterChips
+        options={STATUS_TABS}
+        value={status}
+        onChange={(v) => setStatus(v as Status)}
+      />
 
       {err && <div className="fail">{err}</div>}
-      {loading && <Loading />}
+      {loading && <SkeletonFeed count={6} />}
       {!loading && rows.length === 0 && !err && (
         <div className="empty-state">暂无{STATUS_LABEL[status]}的候选</div>
       )}
@@ -84,27 +82,35 @@ export default function CandidatesPage() {
               >
                 {c.title}
               </a>
-              <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 8 }}>
-                {c.source}
-              </span>
             </div>
             {c.rejected_reason && (
-              <div style={{ fontSize: 12, color: "var(--red)", marginTop: 6, paddingLeft: 10, borderLeft: "2px solid var(--red)" }}>
+              <div
+                style={{
+                  fontSize: 12.5,
+                  color: "var(--red-dim)",
+                  marginTop: 8,
+                  paddingLeft: 10,
+                  borderLeft: "2px solid var(--red)",
+                  lineHeight: 1.6,
+                }}
+              >
                 {c.rejected_reason}
               </div>
             )}
             {c.news_item_id && (
-              <div style={{ fontSize: 12, marginTop: 4 }}>
+              <div style={{ fontSize: 12, marginTop: 6 }}>
                 <Link href={`/news/${c.news_item_id}`}>查看正式记录 →</Link>
               </div>
             )}
-            <div className="news-meta" style={{ marginTop: 6 }}>
+            <div className="news-meta">
+              <span>{c.source}</span>
+              <span className="sep">·</span>
               <span title={new Date(c.fetched_at).toLocaleString("zh-CN")}>
                 {relativeTime(c.fetched_at)}
               </span>
               {c.decided_at && (
                 <>
-                  <span>·</span>
+                  <span className="sep">·</span>
                   <span>决定于 {relativeTime(c.decided_at)}</span>
                 </>
               )}

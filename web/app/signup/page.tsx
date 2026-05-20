@@ -29,40 +29,42 @@ export default function SignupPage() {
   return (
     <main>
       <h1>注册</h1>
-      <p className="desc-block">
-        注册时浏览器会生成一个 Ed25519 密钥对。
-        私钥会用你的密码（Argon2id）加密后作为备份发送给服务器，
-        服务器永远不会看到明文私钥；登录时在浏览器解密即可继续签署投票。
-      </p>
-      <form onSubmit={onSubmit} className="form-grid">
-        <label className="form-label">
-          邮箱
-          <input
-            type="email"
-            className="form-input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-          />
-        </label>
-        <label className="form-label">
-          密码（≥ 8 位）
-          <input
-            type="password"
-            className="form-input"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            autoComplete="new-password"
-          />
-        </label>
-        <button type="submit" disabled={busy}>
-          {busy ? "注册中…" : "注册"}
-        </button>
-      </form>
-      {err && <div className="fail">{err}</div>}
+      <div className="form-card">
+        <p className="form-card-intro">
+          注册时浏览器会生成一个 Ed25519 密钥对。私钥会用你的密码（Argon2id）
+          加密后作为备份发送给服务器，<strong style={{ color: "var(--text)" }}>服务器永远不会看到明文私钥</strong>；
+          登录时在浏览器解密即可继续签署投票。
+        </p>
+        <form onSubmit={onSubmit} className="form-grid">
+          <label className="form-label">
+            邮箱
+            <input
+              type="email"
+              className="form-input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+          </label>
+          <label className="form-label">
+            密码（≥ 8 位）
+            <input
+              type="password"
+              className="form-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              autoComplete="new-password"
+            />
+          </label>
+          <button type="submit" disabled={busy} className="btn-primary">
+            {busy ? "生成密钥对中…" : "注册"}
+          </button>
+        </form>
+        {err && <div className="fail">{err}</div>}
+      </div>
     </main>
   );
 }

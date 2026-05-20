@@ -120,7 +120,7 @@ def test_validate_event_dedupes_repeated_citation_url() -> None:
 
 @pytest.mark.asyncio
 async def test_discover_once_promotes_and_signs(session: AsyncSession) -> None:
-    base = datetime(2026, 5, 12, tzinfo=UTC)
+    base = datetime.now(UTC)
     search = StubSearchClient(
         [
             _hit("化工厂事故 调查取得进展", "https://a.example/1", source="a.example",
@@ -277,7 +277,7 @@ async def test_discover_empty_pool_short_circuits(session: AsyncSession) -> None
 
 @pytest.mark.asyncio
 async def test_discover_pools_multiple_queries_and_dedups(session: AsyncSession) -> None:
-    base = datetime(2026, 5, 12, tzinfo=UTC)
+    base = datetime.now(UTC)
     # Same URL appears under two queries — should only be in the pool once.
     shared = _hit("shared", "https://shared.example/1", source="shared.example",
                   published_at=base)

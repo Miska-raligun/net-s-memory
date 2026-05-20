@@ -29,34 +29,40 @@ export default function LoginPage() {
   return (
     <main>
       <h1>登录</h1>
-      <form onSubmit={onSubmit} className="form-grid">
-        <label className="form-label">
-          邮箱
-          <input
-            type="email"
-            className="form-input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-          />
-        </label>
-        <label className="form-label">
-          密码
-          <input
-            type="password"
-            className="form-input"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-          />
-        </label>
-        <button type="submit" disabled={busy}>
-          {busy ? "登录中…" : "登录"}
-        </button>
-      </form>
-      {err && <div className="fail">{err}</div>}
+      <div className="form-card">
+        <p className="form-card-intro">
+          登录后，浏览器会在本地解密你的 Ed25519 私钥，
+          后续每次投票、发起合入提案都由你本地的私钥签名。
+        </p>
+        <form onSubmit={onSubmit} className="form-grid">
+          <label className="form-label">
+            邮箱
+            <input
+              type="email"
+              className="form-input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+          </label>
+          <label className="form-label">
+            密码
+            <input
+              type="password"
+              className="form-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
+          </label>
+          <button type="submit" disabled={busy} className="btn-primary">
+            {busy ? "解锁中…" : "登录"}
+          </button>
+        </form>
+        {err && <div className="fail">{err}</div>}
+      </div>
     </main>
   );
 }

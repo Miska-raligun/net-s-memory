@@ -38,12 +38,14 @@ export default function Nav() {
   return (
     <nav className="site-nav">
       <Link href="/" className="nav-brand">
-        net-s-memory
+        <span className="brand-mark" aria-hidden>记</span>
+        <span>互联网记忆</span>
       </Link>
       <button
         className="nav-toggle"
         onClick={() => setOpen(!open)}
         aria-label="菜单"
+        aria-expanded={open}
       >
         <span className={`nav-hamburger${open ? " nav-hamburger-open" : ""}`} />
       </button>
@@ -61,9 +63,11 @@ export default function Nav() {
         {user ? (
           <>
             <span className="nav-user">
-              {user.email} · 信誉 {user.reputation.toFixed(1)}
+              <span>{user.email}</span>
+              <span className="rep-pill">REP {user.reputation.toFixed(1)}</span>
             </span>
             <button
+              className="btn-ghost"
               onClick={() => {
                 logout();
                 setUser(null);
