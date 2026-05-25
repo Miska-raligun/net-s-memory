@@ -1,0 +1,326 @@
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime
+
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+# SQLite only autoincrements INTEGER PRIMARY KEY columns; BIGINT primary keys
+# silently break inserts. Use this variant so production (Postgres) still gets
+# BIGSERIAL while tests against sqlite get a working INTEGER PRIMARY KEY.
+_AutoBigInt = BigInteger().with_variant(Integer, "sqlite")
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class NewsItem(Base):
+    __tablename__ = "news_item"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    source_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    lang: Mapped[str] = mapped_column(String(8), nullable=False, default="zh")
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    hot_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    snapshot_uri: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Curation fields populated when an item is produced by the LLM curator
+    # rather than by direct ingest. Left null for legacy / manually-seeded rows.
+    classification: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    why_matters: Mapped[str | None] = mapped_column(Text, nullable=True)
+    citations: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    curator: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    signatures: Mapped[list[NewsSignature]] = relationship(
+        back_populates="news",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("source", "source_id", name="uq_news_item_source_source_id"),
+    )
+
+
+class NewsCandidate(Base):
+    """A raw item pulled from an aggregator before the LLM has judged it.
+
+    Candidates are the input to the curator. The curator decides what (if
+    anything) is worth recording on the public, signed timeline, and either
+    promotes a cluster of candidates into a single NewsItem (status='curated')
+    or marks them rejected with a reason (status='rejected'). Candidates
+    themselves are never signed and never enter the Merkle log.
+    """
+
+    __tablename__ = "news_candidate"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    source_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    lang: Mapped[str] = mapped_column(String(8), nullable=False, default="zh")
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    hot_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    news_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("news_item.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    rejected_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "source", "source_id", name="uq_news_candidate_source_source_id"
+        ),
+    )
+
+
+class NewsSignature(Base):
+    __tablename__ = "news_signature"
+
+    id: Mapped[int] = mapped_column(_AutoBigInt, primary_key=True, autoincrement=True)
+    news_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("news_item.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    signer: Mapped[str] = mapped_column(String(64), nullable=False)
+    alg: Mapped[str] = mapped_column(String(32), nullable=False, default="ed25519")
+    pubkey: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False)
+    sig: Mapped[bytes] = mapped_column(LargeBinary(64), nullable=False)
+    canonical_bytes: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    signed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+    news: Mapped[NewsItem] = relationship(back_populates="signatures")
+
+
+class MerkleLeaf(Base):
+    __tablename__ = "merkle_leaf"
+
+    seq: Mapped[int] = mapped_column(_AutoBigInt, primary_key=True, autoincrement=True)
+    leaf_hash: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False, unique=True)
+    leaf_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    ref_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(), nullable=True, index=True)
+    payload_digest: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+
+class Analysis(Base):
+    __tablename__ = "analysis"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    news_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("news_item.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    corroboration_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    corroboration_sources: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    reputation_label: Mapped[str] = mapped_column(String(16), nullable=False)
+    reputation_weight: Mapped[float] = mapped_column(Float, nullable=False)
+    llm_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    llm_consistency: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    llm_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    llm_evidence: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    llm_model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+    signer: Mapped[str] = mapped_column(String(64), nullable=False)
+    alg: Mapped[str] = mapped_column(String(32), nullable=False, default="ed25519")
+    pubkey: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False)
+    sig: Mapped[bytes] = mapped_column(LargeBinary(64), nullable=False)
+    canonical_bytes: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+
+class UserAccount(Base):
+    __tablename__ = "user_account"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    pubkey_ed25519: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False)
+    encrypted_privkey: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    reputation: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+
+class Vote(Base):
+    __tablename__ = "vote"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    news_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("news_item.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    sig: Mapped[bytes] = mapped_column(LargeBinary(64), nullable=False)
+    canonical_bytes: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    voted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint("news_id", "user_id", name="uq_vote_news_user"),
+    )
+
+
+class Event(Base):
+    __tablename__ = "event"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    slug: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="ongoing")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+
+class EventNews(Base):
+    __tablename__ = "event_news"
+
+    id: Mapped[int] = mapped_column(_AutoBigInt, primary_key=True, autoincrement=True)
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("event.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    news_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("news_item.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="update")
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint("event_id", "news_id", name="uq_event_news_pair"),
+    )
+
+
+class EventFollowup(Base):
+    __tablename__ = "event_followup"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("event.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    model: Mapped[str] = mapped_column(String(64), nullable=False)
+    search_provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="draft")
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+
+class EventMergeProposal(Base):
+    __tablename__ = "event_merge_proposal"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("event.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    followup_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("event_followup.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    proposed_by: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    selected_developments: Mapped[list[dict]] = mapped_column(JSON, nullable=False)
+    proposed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    canonical_bytes: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    sig: Mapped[bytes] = mapped_column(LargeBinary(64), nullable=False)
+    pubkey: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="voting")
+    decided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class MergeProposalVote(Base):
+    __tablename__ = "merge_proposal_vote"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True, default=uuid.uuid4)
+    proposal_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("event_merge_proposal.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    canonical_bytes: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    sig: Mapped[bytes] = mapped_column(LargeBinary(64), nullable=False)
+    voted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint("proposal_id", "user_id", name="uq_merge_proposal_vote_unique"),
+    )
+
+
+class MerkleAnchor(Base):
+    __tablename__ = "merkle_anchor"
+
+    id: Mapped[int] = mapped_column(_AutoBigInt, primary_key=True, autoincrement=True)
+    root_hash: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False)
+    leaf_count: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    anchored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    ots_proof_uri: Mapped[str | None] = mapped_column(Text, nullable=True)
+    btc_block_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    polygon_tx_hash: Mapped[str | None] = mapped_column(String(66), nullable=True)

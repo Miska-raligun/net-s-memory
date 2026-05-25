@@ -1,0 +1,29 @@
+.git
+.github
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.venv/
+backend/.venv/
+backend/.env
+
+# Node
+**/node_modules/
+**/.next/
+**/out/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Local data + secrets
+keys/*
+!keys/.gitkeep
+data/
+*.ots
+infra/deploy.env
