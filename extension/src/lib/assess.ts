@@ -6,16 +6,19 @@ import { runLlmCheck, LlmError } from "./llm";
 import { lookupReputation } from "./reputation";
 import { combineSignals } from "./scoring";
 import { extractDomain, normalizeUrl } from "./url";
-import type { Assessment, LlmConfig, LlmSignal, SignalSet } from "./types";
+import type { Assessment, CommunitySignal, LlmConfig, LlmSignal, SignalSet } from "./types";
 import type { PageInfo } from "./messages";
 
 function isoSeconds(d: Date): string {
   return d.toISOString().replace(/\.\d+Z$/, "Z");
 }
 
+const EMPTY_COMMUNITY: CommunitySignal = { count: 0, weighted_score: null };
+
 export async function assessPage(
   page: PageInfo,
   llmConfig: LlmConfig | null,
+  community: CommunitySignal = EMPTY_COMMUNITY,
 ): Promise<Assessment> {
   const url = normalizeUrl(page.url);
   const domain = extractDomain(url) ?? "";
@@ -53,7 +56,7 @@ export async function assessPage(
     reputation,
     llm,
     corroboration: { count: 0, sources: [] },
-    community: { count: 0, weighted_score: null },
+    community,
   };
   const breakdown = combineSignals(signals);
 

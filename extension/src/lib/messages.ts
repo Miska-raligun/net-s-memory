@@ -11,12 +11,20 @@ export interface PageInfo {
 
 export type Request =
   | { type: "ASSESS"; page: PageInfo; force?: boolean }
-  | { type: "GET_CACHED"; url: string };
+  | { type: "GET_CACHED"; url: string }
+  | { type: "PUBLISH"; url: string };
 
 export type Response =
   | { ok: true; assessment: Assessment; cached: boolean }
   | { ok: true; assessment: null }
+  | { ok: true; published: PublishOutcome }
   | { ok: false; error: string };
+
+export interface PublishOutcome {
+  npub: string;
+  relays_ok: number;
+  relays_failed: number;
+}
 
 export function sendMessage(req: Request): Promise<Response> {
   return chrome.runtime.sendMessage(req) as Promise<Response>;

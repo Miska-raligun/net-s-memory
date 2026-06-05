@@ -23,7 +23,7 @@ export function Popup() {
         return;
       }
       const res = await sendMessage({ type: "GET_CACHED", url });
-      if (res.ok && res.assessment) {
+      if (res.ok && "assessment" in res && res.assessment) {
         setState({ kind: "ready", assessment: res.assessment });
       } else {
         setState({ kind: "none", url });
