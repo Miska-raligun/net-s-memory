@@ -7,21 +7,38 @@ import {
   getCachedAssessment,
   getLlmConfig,
   getNostrSk,
+  getOtsProof,
   getRelays,
   putCachedAssessment,
+  putOtsProof,
 } from "../lib/storage";
 import { normalizeUrl } from "../lib/url";
 import { identityFromSk } from "../lib/nostr/keys";
 import {
   buildAttestation,
+  commitmentDigest,
   parseAttestation,
   urlAddress,
   type ParsedAttestation,
 } from "../lib/nostr/attestation";
 import { publishEvent, queryAttestations, queryFollows } from "../lib/nostr/relay";
 import { computeCommunitySignal } from "../lib/nostr/trust";
+import { inspect, stamp, upgrade } from "../lib/ots/ots";
 import type { CommunitySignal } from "../lib/types";
 import type { Request, Response } from "../lib/messages";
+
+function b64encode(bytes: Uint8Array): string {
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s);
+}
+
+function b64decode(s: string): Uint8Array {
+  const bin = atob(s);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
 
 /** Pull community attestations for a URL from relays and weight them. */
 async function fetchCommunitySignal(normalizedUrl: string): Promise<CommunitySignal> {
@@ -82,11 +99,56 @@ async function handle(msg: Request): Promise<Response> {
     }
     const id = identityFromSk(sk);
     const relays = await getRelays();
-    const event = await buildAttestation(assessment, sk);
+    const otsProof = await getOtsProof(url); // embed anchor proof if we have one
+    const event = await buildAttestation(assessment, sk, otsProof ?? undefined);
     const result = await publishEvent(relays, event);
     return {
       ok: true,
       published: { npub: id.npub, relays_ok: result.ok, relays_failed: result.failed },
+    };
+  }
+
+  if (msg.type === "STAMP") {
+    const url = normalizeUrl(msg.url);
+    const assessment = await getCachedAssessment(url);
+    if (!assessment) return { ok: false, error: "请先评估这篇文章再锚定" };
+    const digest = await commitmentDigest(assessment);
+    const proof = await stamp(digest);
+    if (!proof) return { ok: false, error: "所有日历服务器都没有响应，请稍后重试" };
+    await putOtsProof(url, b64encode(proof));
+    const status = inspect(proof);
+    return {
+      ok: true,
+      anchor: {
+        has_proof: true,
+        pending: status.pending,
+        bitcoin_height: status.bitcoinHeight,
+        complete: status.complete,
+      },
+    };
+  }
+
+  if (msg.type === "CHECK_ANCHOR") {
+    const url = normalizeUrl(msg.url);
+    const stored = await getOtsProof(url);
+    if (!stored) {
+      return { ok: true, anchor: { has_proof: false, pending: [], bitcoin_height: null, complete: false } };
+    }
+    let proof = b64decode(stored);
+    const upgraded = await upgrade(proof); // pending → Bitcoin, if anchored
+    if (upgraded) {
+      proof = upgraded;
+      await putOtsProof(url, b64encode(proof));
+    }
+    const status = inspect(proof);
+    return {
+      ok: true,
+      anchor: {
+        has_proof: true,
+        pending: status.pending,
+        bitcoin_height: status.bitcoinHeight,
+        complete: status.complete,
+      },
     };
   }
 

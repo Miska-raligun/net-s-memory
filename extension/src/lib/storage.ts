@@ -11,6 +11,7 @@ const LLM_KEY = "llm_config";
 const NOSTR_SK_KEY = "nostr_sk";
 const RELAYS_KEY = "nostr_relays";
 const CACHE_PREFIX = "assess:";
+const OTS_PREFIX = "ots:";
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24h
 
 export const DEFAULT_RELAYS = [
@@ -76,4 +77,15 @@ export async function putCachedAssessment(assessment: Assessment): Promise<void>
   const key = CACHE_PREFIX + assessment.url;
   const entry: CacheEntry = { assessment, stored_at: Date.now() };
   await chrome.storage.local.set({ [key]: entry });
+}
+
+// --- OpenTimestamps proofs (base64), keyed by normalized URL ---
+export async function getOtsProof(url: string): Promise<string | null> {
+  const key = OTS_PREFIX + url;
+  const out = await chrome.storage.local.get(key);
+  return (out[key] as string | undefined) ?? null;
+}
+
+export async function putOtsProof(url: string, proofB64: string): Promise<void> {
+  await chrome.storage.local.set({ [OTS_PREFIX + url]: proofB64 });
 }

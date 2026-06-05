@@ -18,6 +18,8 @@ export function Widget({ page }: Props) {
   const [hasRunFull, setHasRunFull] = useState(false);
   const [publishMsg, setPublishMsg] = useState("");
   const [publishing, setPublishing] = useState(false);
+  const [anchorMsg, setAnchorMsg] = useState("");
+  const [anchoring, setAnchoring] = useState(false);
 
   // Instant, network-free preview from cache or reputation-only scoring.
   useEffect(() => {
@@ -69,6 +71,36 @@ export function Widget({ page }: Props) {
     }
   }
 
+  function describeAnchor(a: { has_proof: boolean; pending: string[]; bitcoin_height: number | null; complete: boolean }): string {
+    if (a.complete) return `已锚定到比特币区块 #${a.bitcoin_height}`;
+    if (a.has_proof) return `已提交，等待比特币确认（${a.pending.length} 个日历）。约数小时后点「刷新锚定」`;
+    return "尚未锚定";
+  }
+
+  async function anchor() {
+    setAnchoring(true);
+    setAnchorMsg("");
+    try {
+      const res = await sendMessage({ type: "STAMP", url: page.url });
+      if (res.ok && "anchor" in res) setAnchorMsg(describeAnchor(res.anchor));
+      else if (!res.ok) setAnchorMsg(res.error);
+    } finally {
+      setAnchoring(false);
+    }
+  }
+
+  async function refreshAnchor() {
+    setAnchoring(true);
+    try {
+      const res = await sendMessage({ type: "CHECK_ANCHOR", url: page.url });
+      if (res.ok && "anchor" in res) {
+        setAnchorMsg(res.anchor.has_proof ? describeAnchor(res.anchor) : "尚未锚定，先点「锚定到比特币」");
+      }
+    } finally {
+      setAnchoring(false);
+    }
+  }
+
   function toggle() {
     const next = !open;
     setOpen(next);
@@ -99,6 +131,9 @@ export function Widget({ page }: Props) {
               <button className="nsm-btn" onClick={endorse} disabled={publishing}>
                 {publishing ? "发布中…" : "背书（发布到 Nostr）"}
               </button>
+              <button className="nsm-btn" onClick={anchor} disabled={anchoring}>
+                {anchoring ? "处理中…" : "锚定到比特币"}
+              </button>
               <button className="nsm-btn" onClick={() => chrome.runtime.openOptionsPage()}>
                 设置
               </button>
@@ -106,6 +141,26 @@ export function Widget({ page }: Props) {
             {publishMsg ? (
               <div className="cred-disclaim" style={{ borderTop: "none", paddingTop: 8 }}>
                 {publishMsg}
+              </div>
+            ) : null}
+            {anchorMsg ? (
+              <div className="cred-disclaim" style={{ borderTop: "none", paddingTop: 8 }}>
+                {anchorMsg} ·{" "}
+                <span
+                  style={{ textDecoration: "underline", cursor: "pointer" }}
+                  onClick={refreshAnchor}
+                >
+                  刷新锚定
+                </span>{" "}
+                ·{" "}
+                <a
+                  href="https://opentimestamps.org/"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: "var(--text-dim)" }}
+                >
+                  官方验证
+                </a>
               </div>
             ) : null}
             {!llmConfigured ? (

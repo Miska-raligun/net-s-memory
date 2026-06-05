@@ -18,7 +18,12 @@
 - ✅ **Phase 2/3 Nostr**：secp256k1/schnorr 身份；可信度断言签名为
   参数化可替换事件（kind 30909，按归一化 URL 寻址）发布到公共中继；
   订阅他人断言、客户端验签、按 NIP-02 关注图谱加权（信任网络）
-- ⏳ Phase 4：OpenTimestamps 比特币锚定
+- ✅ **Phase 4 OpenTimestamps**：把评估承诺哈希提交到公共日历服务器、
+  锚定到比特币；「锚定到比特币 / 刷新锚定」按钮显示区块高度。
+  `.ots` 二进制格式**自研零依赖实现**（Web Crypto + fetch），并在单测里
+  与官方 `opentimestamps` 库做了逐字节交叉校验（运行时不打包该库，
+  避开 node crypto/fs/bitcore）。锚定证明可嵌入 Nostr 事件一并传播。
+  完整无信任的比特币区块头校验交给官方验证器（界面提供链接）。
 - ⏳ Phase 5：把后端已有签名 analysis 桥接到 Nostr 做冷启动种子
 
 隐私：正文只发给你在设置里填写的 LLM 端点；评估只在你点开徽章面板时触发；
