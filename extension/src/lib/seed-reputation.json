@@ -1,0 +1,30 @@
+{
+  "_comment": "Domain-keyed seed reputation prior, ported & extended from net-s-memory backend/app/analyze/source_reputation.py. Weights in [0,1] are conservative starting points; community attestations are meant to override them over time.",
+  "default_weight": 0.5,
+  "domains": {
+    "people.com.cn": 0.9,
+    "xinhuanet.com": 0.9,
+    "news.cn": 0.9,
+    "gov.cn": 0.9,
+    "cctv.com": 0.85,
+    "caixin.com": 0.85,
+    "thepaper.cn": 0.8,
+    "scmp.com": 0.8,
+    "ifeng.com": 0.6,
+    "sohu.com": 0.55,
+    "qq.com": 0.5,
+    "163.com": 0.5,
+    "sina.com.cn": 0.5,
+    "zhihu.com": 0.5,
+    "toutiao.com": 0.4,
+    "weibo.com": 0.4,
+    "weibo.cn": 0.4,
+    "baidu.com": 0.4,
+    "reuters.com": 0.85,
+    "apnews.com": 0.85,
+    "bbc.com": 0.8,
+    "nytimes.com": 0.8,
+    "wsj.com": 0.8,
+    "theguardian.com": 0.75
+  }
+}

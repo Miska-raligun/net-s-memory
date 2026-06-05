@@ -1,0 +1,28 @@
+{
+  "name": "nsm-credibility-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Decentralized source-credibility browser extension for 互联网记忆 (net-s-memory). No self-hosted backend: client-side LLM assessment + Nostr P2P attestations.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.4.0",
+    "@types/chrome": "^0.0.287",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.5.4",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
+  }
+}
