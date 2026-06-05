@@ -24,7 +24,11 @@
   与官方 `opentimestamps` 库做了逐字节交叉校验（运行时不打包该库，
   避开 node crypto/fs/bitcore）。锚定证明可嵌入 Nostr 事件一并传播。
   完整无信任的比特币区块头校验交给官方验证器（界面提供链接）。
-- ⏳ Phase 5：把后端已有签名 analysis 桥接到 Nostr 做冷启动种子
+- ✅ **Phase 5 冷启动桥接**（后端，可选）：`python -m app.bridge.run` 把
+  net-s-memory 已有的签名 analysis 重新发布成 Nostr 存证（用桥接身份签名），
+  让新装扩展的用户一上来就能看到种子数据而非空网络。这是唯一碰后端的部分，
+  完全 opt-in（不配 `NOSTR_BRIDGE_SECKEY` 就什么都不做），且 URL 归一化/寻址
+  与扩展逐一对齐（见 backend/tests/test_bridge.py 的 parity 测试）。
 
 隐私：正文只发给你在设置里填写的 LLM 端点；评估只在你点开徽章面板时触发；
 **背书（发布到 Nostr）是显式操作**，默认不向任何第三方广播浏览行为。

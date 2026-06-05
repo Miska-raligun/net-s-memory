@@ -38,5 +38,11 @@ class Settings(BaseSettings):
 
     cors_origins: str = ""
 
+    # Phase 5 — optional Nostr bridge: republish signed analyses to public
+    # relays as cold-start seed data for the decentralized extension. The
+    # bridge is a manually-run CLI; if no key is set it does nothing.
+    nostr_bridge_seckey: str = ""  # 32-byte secp256k1 secret key, hex
+    nostr_relays: str = "wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band"
+
 
 settings = Settings()
