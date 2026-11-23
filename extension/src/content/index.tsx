@@ -1,27 +1,37 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Widget } from "./Widget";
-import { extractArticle } from "../lib/extract";
+import { bodyText, extractArticle, navigationStatus, snapshotHtml } from "../lib/extract";
+import { detectPageState, isGone } from "../lib/archive/detect";
 import cardCss from "../ui/card.css?inline";
-import type { PageInfo } from "../lib/messages";
+import { sendMessage, type PageInfo, type Response } from "../lib/messages";
 
 const MIN_ARTICLE_CHARS = 600;
 const HOST_ID = "nsm-credibility-host";
 
+function nextFrame(): Promise<void> {
+  return new Promise((r) => requestAnimationFrame(() => r()));
+}
+
 function mount() {
-  // Only run in the top frame and only on article-like pages, so we don't
-  // litter app shells / iframes with a badge.
+  // Only the top frame, only once.
   if (window.top !== window.self) return;
   if (document.getElementById(HOST_ID)) return;
 
-  const extracted = extractArticle();
-  if (extracted.text.length < MIN_ARTICLE_CHARS) return;
-
-  const page: PageInfo = {
+  const detection = detectPageState({
     url: location.href,
-    title: extracted.title,
-    text: extracted.text,
-  };
+    title: document.title,
+    bodyText: bodyText(),
+    httpStatus: navigationStatus(),
+  });
+  const gone = isGone(detection.state);
+  const extracted = gone ? { title: document.title, text: "" } : extractArticle();
+  const articleLike = extracted.text.replace(/\s+/g, "").length >= MIN_ARTICLE_CHARS;
+
+  // Show up on article pages and on deletion pages; stay out of app shells.
+  if (!gone && !articleLike) return;
+
+  const page: PageInfo = { url: location.href, title: extracted.title, text: extracted.text };
 
   const host = document.createElement("div");
   host.id = HOST_ID;
@@ -35,9 +45,33 @@ function mount() {
   const mountPoint = document.createElement("div");
   shadow.appendChild(mountPoint);
 
+  async function capture(): Promise<Response> {
+    // Re-extract at click time: the page may have lazy-loaded more content.
+    const fresh = extractArticle();
+    host.style.visibility = "hidden"; // keep the widget out of the screenshot
+    await nextFrame();
+    await nextFrame();
+    try {
+      return await sendMessage({
+        type: "CAPTURE",
+        input: {
+          url: location.href,
+          title: fresh.title,
+          text: fresh.text,
+          page_state: detection.state,
+          page_evidence: detection.evidence,
+          platform: detection.platform,
+        },
+        html: snapshotHtml(HOST_ID),
+      });
+    } finally {
+      host.style.visibility = "";
+    }
+  }
+
   createRoot(mountPoint).render(
     <StrictMode>
-      <Widget page={page} />
+      <Widget page={page} detection={detection} articleLike={articleLike} capture={capture} />
     </StrictMode>,
   );
 }

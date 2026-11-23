@@ -10,6 +10,7 @@ import {
 } from "../lib/storage";
 import { createIdentity, identityFromSk, importNsec, nsecOf } from "../lib/nostr/keys";
 import type { LlmConfig } from "../lib/types";
+import { ArchiveSettings } from "./ArchiveSettings";
 
 interface Preset {
   name: string;
@@ -102,7 +103,7 @@ export function Options() {
 
   return (
     <div className="nsm-root nsm-options">
-      <h1>互联网记忆 · 信源可信度</h1>
+      <h1>互联网记忆 · LLM 设置（可选）</h1>
       <div className="sub">
         去中心化、零自建服务器。可信度评估调用<strong>你自己的 LLM key</strong>，在本地完成；
         正文只会发给你填写的端点，不经过任何第三方服务器。
@@ -219,6 +220,8 @@ export function Options() {
         保存中继
       </button>
       {nostrStatus ? <div className="nsm-status">{nostrStatus}</div> : null}
+
+      <ArchiveSettings />
 
       <div className="nsm-note">
         所有密钥仅保存在浏览器本地（chrome.storage.local），不上传、不同步。

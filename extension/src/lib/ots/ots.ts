@@ -57,9 +57,22 @@ function mergeNodes(into: TsNode, from: TsNode): void {
   }
 }
 
+/** Calendar requests must never hang a capture: abort after this long. */
+export const CALENDAR_TIMEOUT_MS = 15_000;
+
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), CALENDAR_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function postDigest(calendar: string, tip: Uint8Array): Promise<TsNode | null> {
   try {
-    const res = await fetch(calendar + "/digest", {
+    const res = await fetchWithTimeout(calendar + "/digest", {
       method: "POST",
       headers: {
         Accept: "application/vnd.opentimestamps.v1",
@@ -88,9 +101,10 @@ export async function stamp(
   const tip = await sha256(concat(fileDigest, nonce));
 
   const tipNode: TsNode = { attestations: [], ops: [] };
+  // Query calendars in parallel; merge in a fixed order for determinism.
+  const nodes = await Promise.all(calendars.map((cal) => postDigest(cal, tip)));
   let merged = 0;
-  for (const cal of calendars) {
-    const node = await postDigest(cal, tip);
+  for (const node of nodes) {
     if (node) {
       mergeNodes(tipNode, node);
       merged++;
@@ -164,7 +178,7 @@ export async function upgrade(proofBytes: Uint8Array): Promise<Uint8Array | null
   let changed = false;
   for (const uri of pendingUris) {
     try {
-      const res = await fetch(uri + "/timestamp/" + toHex(commitment), {
+      const res = await fetchWithTimeout(uri + "/timestamp/" + toHex(commitment), {
         headers: { Accept: "application/vnd.opentimestamps.v1" },
       });
       if (!res.ok) continue;

@@ -26,19 +26,16 @@ import { computeCommunitySignal } from "../lib/nostr/trust";
 import { inspect, stamp, upgrade } from "../lib/ots/ots";
 import type { CommunitySignal } from "../lib/types";
 import type { Request, Response } from "../lib/messages";
-
-function b64encode(bytes: Uint8Array): string {
-  let s = "";
-  for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s);
-}
-
-function b64decode(s: string): Uint8Array {
-  const bin = atob(s);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
+import {
+  b64decode,
+  b64encode,
+  captureExtras,
+  captureLocal,
+  publishCapture,
+  refreshCaptureAnchor,
+} from "./archive";
+import { searchElsewhere } from "./search";
+import { deleteCapture, getCapture, listCaptures } from "../lib/storage";
 
 /** Pull community attestations for a URL from relays and weight them. */
 async function fetchCommunitySignal(normalizedUrl: string): Promise<CommunitySignal> {
@@ -64,7 +61,44 @@ async function fetchCommunitySignal(normalizedUrl: string): Promise<CommunitySig
   }
 }
 
-async function handle(msg: Request): Promise<Response> {
+async function handle(msg: Request, sender: chrome.runtime.MessageSender): Promise<Response> {
+  switch (msg.type) {
+    case "CAPTURE": {
+      const { capture, warnings } = await captureLocal(msg.input, msg.html, sender.tab?.windowId);
+      return { ok: true, capture, warnings };
+    }
+    case "CAPTURE_EXTRAS": {
+      const { capture, anchor, warnings } = await captureExtras(msg.id);
+      return { ok: true, capture, anchor, warnings };
+    }
+    case "REFRESH_CAPTURE_ANCHOR": {
+      const { capture, anchor } = await refreshCaptureAnchor(msg.id);
+      return { ok: true, capture, anchor };
+    }
+    case "PUBLISH_CAPTURE": {
+      const { capture, published, warnings } = await publishCapture(msg.id);
+      return { ok: true, capture, published, warnings };
+    }
+    case "LIST_CAPTURES":
+      return { ok: true, captures: await listCaptures(msg.url ? normalizeUrl(msg.url) : undefined) };
+    case "GET_CAPTURE": {
+      const capture = await getCapture(msg.id);
+      return capture ? { ok: true, capture } : { ok: false, error: "找不到这份存档" };
+    }
+    case "DELETE_CAPTURE":
+      await deleteCapture(msg.id);
+      return { ok: true, done: true };
+    case "OPEN_ARCHIVE": {
+      const base = chrome.runtime.getURL("src/archive/index.html");
+      await chrome.tabs.create({ url: msg.id ? `${base}#${encodeURIComponent(msg.id)}` : base });
+      return { ok: true, done: true };
+    }
+    case "SEARCH":
+      return { ok: true, search: await searchElsewhere(msg.query, msg.excludeUrl) };
+    default:
+      break;
+  }
+
   if (msg.type === "GET_CACHED") {
     const cached = await getCachedAssessment(normalizeUrl(msg.url));
     return cached ? { ok: true, assessment: cached, cached: true } : { ok: true, assessment: null };
@@ -155,8 +189,8 @@ async function handle(msg: Request): Promise<Response> {
   return { ok: false, error: "unknown message type" };
 }
 
-chrome.runtime.onMessage.addListener((msg: Request, _sender, sendResponse) => {
-  handle(msg)
+chrome.runtime.onMessage.addListener((msg: Request, sender, sendResponse) => {
+  handle(msg, sender)
     .then(sendResponse)
     .catch((e: unknown) =>
       sendResponse({ ok: false, error: e instanceof Error ? e.message : String(e) }),

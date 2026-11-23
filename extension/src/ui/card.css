@@ -168,3 +168,42 @@
   color: var(--text-muted);
   font-size: 12px;
 }
+
+/* --- Archive panel ------------------------------------------------------ */
+.nsm-panel {
+  max-height: calc(100vh - 90px); overflow-y: auto; box-sizing: border-box;
+  padding: 14px; background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  font-size: 13px; line-height: 1.5;
+}
+.nsm-btn:disabled { opacity: 0.55; cursor: default; }
+.nsm-btn-primary { background: #2f6feb; border-color: #2f6feb; color: #fff; }
+.nsm-btn-primary:hover { color: #fff; filter: brightness(1.08); }
+.nsm-badge-gone { border-color: var(--red); }
+.nsm-badge-gone .nsm-badge-label { color: var(--text); }
+.nsm-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: #58a6ff; font-size: 12px; font-family: var(--font-sans);
+}
+.arc { display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+.arc a { color: #58a6ff; }
+.arc .nsm-actions { margin-top: 4px; }
+.arc-gone {
+  padding: 10px 12px; border: 1px solid var(--red); border-radius: 8px;
+  background: rgba(229, 83, 75, 0.12);
+}
+.arc-gone-title { font-size: 14px; font-weight: 700; color: var(--red); margin-bottom: 4px; }
+.arc-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--text-dim); }
+.arc-dim { color: var(--text-muted); font-size: 11px; line-height: 1.5; }
+.arc-warn { color: var(--amber); font-size: 11px; line-height: 1.5; }
+.arc-mono { font-family: var(--font-mono); }
+.arc-detail { margin-top: 2px; }
+.arc-hits { display: flex; flex-direction: column; gap: 8px; }
+.arc-hit a { font-size: 12px; line-height: 1.4; text-decoration: none; }
+.arc-hit a:hover { text-decoration: underline; }
+.arc-tag {
+  margin-left: 6px; padding: 0 5px; border: 1px solid var(--border);
+  border-radius: 4px; font-size: 10px; color: var(--amber);
+}
+.arc-cred { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+.arc-cred > summary { cursor: pointer; color: var(--text-muted); font-size: 12px; margin-bottom: 8px; }

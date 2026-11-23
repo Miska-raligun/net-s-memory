@@ -27,12 +27,15 @@ const SYSTEM_PROMPT =
   "给出一个 0-100 的可信度信号分（不是对真假的最终判定）。" +
   '只输出 JSON：{"score": <0-100整数>, "consistency": "high|medium|low|contradictory", "summary": "<不超过40字的中文理由>"}。';
 
+// The archive keeps the full text; only the LLM prompt is capped.
+const MAX_LLM_TEXT_CHARS = 8000;
+
 function buildUserPrompt(input: LlmCheckInput): string {
   return [
     `来源域名：${input.domain}（种子信誉：${input.reputationLabel}）`,
     `标题：${input.title}`,
     "正文（可能被截断）：",
-    input.text,
+    input.text.slice(0, MAX_LLM_TEXT_CHARS),
   ].join("\n");
 }
 

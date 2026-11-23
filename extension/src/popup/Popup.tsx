@@ -34,7 +34,7 @@ export function Popup() {
   return (
     <div className="nsm-root" style={{ width: 320, padding: 14, background: "var(--bg-surface)" }}>
       <div className="nsm-panel-head">
-        <span className="nsm-panel-title">互联网记忆 · 信源可信度</span>
+        <span className="nsm-panel-title">互联网记忆</span>
       </div>
 
       {state.kind === "loading" ? <div className="nsm-muted">加载中…</div> : null}
@@ -48,6 +48,9 @@ export function Popup() {
       {state.kind === "ready" ? <CredibilityCard assessment={state.assessment} /> : null}
 
       <div className="nsm-actions">
+        <button className="nsm-btn" onClick={() => sendMessage({ type: "OPEN_ARCHIVE" })}>
+          我的存档
+        </button>
         <button className="nsm-btn" onClick={() => chrome.runtime.openOptionsPage()}>
           设置 {llmConfigured ? "" : "（未配置 LLM key）"}
         </button>
