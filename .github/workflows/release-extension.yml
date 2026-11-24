@@ -1,13 +1,18 @@
 name: Release extension
 
-# Push a tag like v0.2.0 to build the browser extension and publish it as a
-# GitHub Release. The tag (minus the "v") becomes the extension version, so
-# it must be 1–4 dot-separated integers (a Chrome manifest requirement).
-# Can also be run by hand from the Actions tab for an existing tag.
+# Builds the browser extension and attaches it to a GitHub Release. Any of:
+#   - push a tag like v0.2.0
+#   - publish a Release in the GitHub UI (Releases → Draft a new release →
+#     new tag v0.2.0 on main → Publish); the zip is attached automatically
+#   - run it by hand from the Actions tab for an existing tag
+# The tag (minus the "v") becomes the extension version, so it must be 1–4
+# dot-separated integers (a Chrome manifest requirement).
 
 on:
   push:
     tags: ["v*"]
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       tag:
@@ -17,6 +22,12 @@ on:
 permissions:
   contents: write
 
+# A UI release can fire both "release" and tag "push"; run them one at a time
+# so the second run only re-uploads (idempotent) instead of racing the first.
+concurrency:
+  group: release-extension
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -24,7 +35,7 @@ jobs:
       run:
         working-directory: extension
     env:
-      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event_name == 'release' && github.event.release.tag_name || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -105,7 +116,12 @@ jobs:
           NAME="${{ steps.pkg.outputs.name }}"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$NAME" "$NAME.sha256" --clobber
-            gh release edit "$TAG" --notes-file notes.md
+            # Keep any notes written in the UI; append the install/verify section once.
+            OLD="$(gh release view "$TAG" --json body --jq .body)"
+            if ! grep -q "## 校验" <<<"$OLD"; then
+              { [ -n "$OLD" ] && printf '%s\n\n' "$OLD"; cat notes.md; } > merged.md
+              gh release edit "$TAG" --notes-file merged.md
+            fi
           else
             gh release create "$TAG" "$NAME" "$NAME.sha256" \
               --title "互联网记忆 扩展 $TAG" --notes-file notes.md --verify-tag
