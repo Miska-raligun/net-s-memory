@@ -104,6 +104,15 @@ ots verify <id>.txt.ots     # 证明这段正文在对应比特币区块之前�
 | `extension/` | **主线** | MV3 浏览器扩展（Vite + CRXJS + React + TypeScript），详见 [extension/README.md](extension/README.md) |
 | `backend/`、`web/`、`infra/`、`deploy.sh` | **冻结** | 旧的中心化实现，不再开发 |
 
+### 安装发布版
+
+到 [Releases](https://github.com/Miska-raligun/net-s-memory/releases) 下载最新的
+`net-s-memory-extension-vX.Y.Z.zip`（可用同名 `.sha256` 文件校验），解压到一个固定的文件夹。
+然后打开 `chrome://extensions`，开启「开发者模式」，点「加载已解压的扩展程序」，选择解压出的文件夹。
+
+发新版本：给 main 上的提交打 `vX.Y.Z` 标签并推送。`.github/workflows/release-extension.yml` 会自动测试、
+构建并发布 Release，标签里的版本号会写进扩展的 manifest。
+
 ### 开发
 
 ```bash
