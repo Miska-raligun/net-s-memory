@@ -1,0 +1,217 @@
+/* Self-contained styles for the credibility widget. The `.cred-*` rules are
+   ported from net-s-memory web/app/globals.css so the extension card mirrors
+   the site visually; variables are bundled here (instead of inherited from
+   the host page :root) so the widget renders identically inside a Shadow DOM
+   on any site. */
+
+.nsm-root {
+  --bg-card: #1b1f27;
+  --bg-surface: #11141a;
+  --border: #2a2f3a;
+  --text: #e6e9ef;
+  --text-dim: #b8c0cc;
+  --text-muted: #8a93a3;
+  --red: #e5534b;
+  --amber: #e3b341;
+  --green: #3fb950;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+/* Floating badge (content script only) */
+.nsm-badge {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483646;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  user-select: none;
+}
+.nsm-badge-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: none;
+}
+.nsm-badge-num {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 15px;
+}
+.nsm-badge-label {
+  color: var(--text-muted);
+}
+
+.nsm-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 60px;
+  z-index: 2147483647;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+}
+
+.nsm-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.nsm-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.nsm-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Ported credibility card */
+.cred-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+}
+.cred-score {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.03em;
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+.cred-score-suffix {
+  font-size: 14px;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-weight: 500;
+}
+.cred-bar {
+  height: 6px;
+  background: var(--bg-surface);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 14px 0;
+}
+.cred-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--red) 0%, var(--amber) 50%, var(--green) 100%);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.cred-rows {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.cred-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.cred-row-key {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.cred-row-val {
+  color: var(--text);
+  text-align: right;
+}
+.cred-disclaim {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.nsm-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.nsm-btn {
+  flex: 1;
+  padding: 7px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+.nsm-btn:hover {
+  color: var(--text);
+}
+.nsm-muted {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* --- Archive panel ------------------------------------------------------ */
+.nsm-panel {
+  max-height: calc(100vh - 90px); overflow-y: auto; box-sizing: border-box;
+  padding: 14px; background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  font-size: 13px; line-height: 1.5;
+}
+.nsm-btn:disabled { opacity: 0.55; cursor: default; }
+.nsm-btn-primary { background: #2f6feb; border-color: #2f6feb; color: #fff; }
+.nsm-btn-primary:hover { color: #fff; filter: brightness(1.08); }
+.nsm-badge-gone { border-color: var(--red); }
+.nsm-badge-gone .nsm-badge-label { color: var(--text); }
+.nsm-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: #58a6ff; font-size: 12px; font-family: var(--font-sans);
+}
+.arc { display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+.arc a { color: #58a6ff; }
+.arc .nsm-actions { margin-top: 4px; }
+.arc-gone {
+  padding: 10px 12px; border: 1px solid var(--red); border-radius: 8px;
+  background: rgba(229, 83, 75, 0.12);
+}
+.arc-gone-title { font-size: 14px; font-weight: 700; color: var(--red); margin-bottom: 4px; }
+.arc-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--text-dim); }
+.arc-dim { color: var(--text-muted); font-size: 11px; line-height: 1.5; }
+.arc-warn { color: var(--amber); font-size: 11px; line-height: 1.5; }
+.arc-mono { font-family: var(--font-mono); }
+.arc-detail { margin-top: 2px; }
+.arc-hits { display: flex; flex-direction: column; gap: 8px; }
+.arc-hit a { font-size: 12px; line-height: 1.4; text-decoration: none; }
+.arc-hit a:hover { text-decoration: underline; }
+.arc-tag {
+  margin-left: 6px; padding: 0 5px; border: 1px solid var(--border);
+  border-radius: 4px; font-size: 10px; color: var(--amber);
+}
+.arc-cred { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+.arc-cred > summary { cursor: pointer; color: var(--text-muted); font-size: 12px; margin-bottom: 8px; }
+
+/* --- Witnesses ------------------------------------------------------------ */
+.arc-witness { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 2px; }
+.arc-section-title { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+.arc-version { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
+.arc-version-local { border-color: var(--green); }
+.arc-excerpt { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+.nsm-link:disabled { color: var(--text-muted); cursor: default; }
