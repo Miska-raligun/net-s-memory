@@ -1,29 +1,37 @@
 name: Release extension
 
-# Builds the browser extension and attaches it to a GitHub Release. Any of:
-#   - push a tag like v0.2.0
-#   - publish a Release in the GitHub UI (Releases → Draft a new release →
-#     new tag v0.2.0 on main → Publish); the zip is attached automatically
-#   - run it by hand from the Actions tab for an existing tag
-# The tag (minus the "v") becomes the extension version, so it must be 1–4
-# dot-separated integers (a Chrome manifest requirement).
+# Fully automatic releases of the browser extension.
+#
+#   Normal flow: bump "version" in extension/package.json in a PR and merge it.
+#   On the push to main this workflow sees that v<version> has no Release yet,
+#   runs the tests, builds, creates the tag + GitHub Release itself and
+#   attaches the zip and its .sha256. Nothing to do by hand.
+#
+#   Also supported: pushing a vX.Y.Z tag, publishing a Release in the UI, or
+#   "Run workflow" in the Actions tab (optionally with an existing tag).
+#
+# The version must be 1–4 dot-separated integers (Chrome manifest rule).
+# Tags/releases created here with GITHUB_TOKEN do not re-trigger workflows,
+# so there is no release loop.
 
 on:
   push:
+    branches: [main]
+    paths: ["extension/**", ".github/workflows/release-extension.yml"]
     tags: ["v*"]
   release:
     types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to (re)build, e.g. v0.2.0"
-        required: true
+        description: "Existing tag to (re)build, e.g. v0.2.0. Empty = version in extension/package.json on the selected branch"
+        required: false
+        default: ""
 
 permissions:
   contents: write
 
-# A UI release can fire both "release" and tag "push"; run them one at a time
-# so the second run only re-uploads (idempotent) instead of racing the first.
+# Runs for the same release must not race each other.
 concurrency:
   group: release-extension
   cancel-in-progress: false
@@ -34,48 +42,83 @@ jobs:
     defaults:
       run:
         working-directory: extension
-    env:
-      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event_name == 'release' && github.event.release.tag_name || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.TAG }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.sha }}
+
+      - name: Decide what to release
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$EVENT" = "release" ]; then
+            TAG="$RELEASE_TAG"
+          elif [ "$EVENT" = "push" ] && [ "$REF_TYPE" = "tag" ]; then
+            TAG="$REF_NAME"
+          elif [ "$EVENT" = "workflow_dispatch" ] && [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
+            TAG="v$PKG_VERSION"   # push to main, or dispatch without a tag
+          fi
+          VERSION="${TAG#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){0,3}$ ]]; then
+            echo "::error::$TAG is not a valid extension version (expected vX.Y.Z)"
+            exit 1
+          fi
+
+          SKIP=false
+          if [ "$EVENT" = "push" ] && [ "$REF_TYPE" = "branch" ]; then
+            # Auto mode: only release a version that has no complete Release yet.
+            ASSETS="$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null || true)"
+            if grep -q "^net-s-memory-extension-$TAG.zip$" <<<"$ASSETS"; then
+              echo "$TAG is already released; bump extension/package.json to release again."
+              SKIP=true
+            fi
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
+          echo "Release plan: tag=$TAG skip=$SKIP (event=$EVENT)"
 
       - uses: actions/setup-node@v4
+        if: steps.plan.outputs.skip != 'true'
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: extension/package-lock.json
 
-      - name: Derive version from tag
-        id: ver
-        run: |
-          VERSION="${TAG#v}"
-          if ! [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){0,3}$ ]]; then
-            echo "::error::Tag $TAG must look like v1.2.3 (Chrome extension version rules)"
-            exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
       - name: Install
+        if: steps.plan.outputs.skip != 'true'
         run: npm ci
 
       - name: Set package version
-        run: npm version --no-git-tag-version --allow-same-version "${{ steps.ver.outputs.version }}"
+        if: steps.plan.outputs.skip != 'true'
+        run: npm version --no-git-tag-version --allow-same-version "${{ steps.plan.outputs.version }}"
 
       - name: Typecheck
+        if: steps.plan.outputs.skip != 'true'
         run: npm run typecheck
 
       - name: Test
+        if: steps.plan.outputs.skip != 'true'
         run: npm run test
 
       - name: Build
+        if: steps.plan.outputs.skip != 'true'
         run: npm run build
 
       - name: Package
         id: pkg
+        if: steps.plan.outputs.skip != 'true'
         run: |
-          VERSION="${{ steps.ver.outputs.version }}"
+          VERSION="${{ steps.plan.outputs.version }}"
           grep -q "\"version\": \"$VERSION\"" dist/manifest.json
           NAME="net-s-memory-extension-v$VERSION.zip"
           (cd dist && zip -qr "../$NAME" .)
@@ -84,6 +127,7 @@ jobs:
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
       - name: Release notes
+        if: steps.plan.outputs.skip != 'true'
         run: |
           NAME="${{ steps.pkg.outputs.name }}"
           SUM="$(cut -d' ' -f1 "$NAME.sha256")"
@@ -110,8 +154,10 @@ jobs:
           EOF
 
       - name: Publish GitHub Release
+        if: steps.plan.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.plan.outputs.tag }}
         run: |
           NAME="${{ steps.pkg.outputs.name }}"
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -123,6 +169,9 @@ jobs:
               gh release edit "$TAG" --notes-file merged.md
             fi
           else
+            # Creates the tag at this commit if it does not exist yet.
             gh release create "$TAG" "$NAME" "$NAME.sha256" \
-              --title "互联网记忆 扩展 $TAG" --notes-file notes.md --verify-tag
+              --target "$GITHUB_SHA" \
+              --title "互联网记忆 扩展 $TAG" --notes-file notes.md
           fi
+          echo "Released: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/$TAG"

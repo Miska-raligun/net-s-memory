@@ -110,13 +110,10 @@ ots verify <id>.txt.ots     # 证明这段正文在对应比特币区块之前�
 `net-s-memory-extension-vX.Y.Z.zip`（可用同名 `.sha256` 文件校验），解压到一个固定的文件夹。
 然后打开 `chrome://extensions`，开启「开发者模式」，点「加载已解压的扩展程序」，选择解压出的文件夹。
 
-发新版本（任选一种）：
-
-- 在 GitHub 网页上依次进入 Releases → Draft a new release，新建标签 `vX.Y.Z`，目标选 main，然后 Publish；
-- 或者给 main 上的提交打 `vX.Y.Z` 标签并推送。
-
-两种方式都会触发 `.github/workflows/release-extension.yml`：自动测试、构建，把 zip 和 `.sha256` 附到 Release 上，
-并把标签里的版本号写进扩展的 manifest。
+发新版本是全自动的：在 PR 里修改 `extension/package.json` 的 `version`（例如改成 `0.3.0`），合并进 main 即可。
+`.github/workflows/release-extension.yml` 发现 `v0.3.0` 还没有发布，就会自动跑测试、构建、创建标签和 Release，
+并附上 zip 和 `.sha256`。已经发布过的版本号不会重复发布。另外也支持推送 `vX.Y.Z` 标签、
+在网页上发布 Release，或者在 Actions 页手动「Run workflow」。
 
 ### 开发
 
