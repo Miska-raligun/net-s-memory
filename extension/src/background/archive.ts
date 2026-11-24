@@ -154,6 +154,9 @@ export async function publishCapture(
 ): Promise<{ capture: Capture; published: PublishOutcome; warnings: string[] }> {
   const capture = await getCapture(id);
   if (!capture) throw new Error("找不到这份存档");
+  if (capture.witness_of) {
+    throw new Error("这是从别人的见证导入的副本，你没有亲眼见到原页面，不能以自己的名义再发布见证");
+  }
   const settings = await getArchiveSettings();
   const sk = await ensureSk();
   const warnings: string[] = [];

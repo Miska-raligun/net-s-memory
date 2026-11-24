@@ -17,6 +17,7 @@ const TOGGLES: { key: BoolKey; label: string; hint: string }[] = [
   { key: "html", label: "本地保存原始 HTML", hint: "仅存本机。" },
   { key: "publish_screenshot", label: "发布见证时上传截图", hint: "截图可能包含你的登录头像/昵称，默认关闭。" },
   { key: "publish_html", label: "发布见证时上传 HTML", hint: "登录状态下的 HTML 常含你的账号信息，默认关闭。" },
+  { key: "recheck", label: "定期回访我存过的链接", hint: "后台不带 cookie 地重新打开存过的链接（1 小时、6 小时、1 天…最长 3 个月），发现被删就在图标上提示。微博、知乎等需要登录渲染的平台只在你亲自访问时判断。" },
   { key: "hide_domestic", label: "查找其他报道时隐藏境内来源", hint: "只显示境外站点的报道，作为不受同一删帖压力影响的独立印证。" },
 ];
 

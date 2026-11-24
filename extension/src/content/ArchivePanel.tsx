@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { STATE_LABEL, isGone, type Detection } from "../lib/archive/detect";
 import type { Capture } from "../lib/archive/capture";
+import { WitnessSection } from "./WitnessSection";
 import { sendMessage, type AnchorOutcome, type PageInfo, type Response, type SearchOutcome } from "../lib/messages";
 import type { CaptureSummary } from "../lib/storage";
 
@@ -131,7 +132,7 @@ export function ArchivePanel({ page, detection, capture, onArchived }: Props) {
           </button>
         </div>
       ) : gone ? (
-        <div className="arc-dim">本机没有这页的存档。查找其他人的见证将在下一版加入。</div>
+        <div className="arc-dim">本机没有这页的存档，可以在下面查询其他人的见证。</div>
       ) : null}
 
       {!gone ? (
@@ -186,6 +187,8 @@ export function ArchivePanel({ page, detection, capture, onArchived }: Props) {
           {n}
         </div>
       ))}
+
+      <WitnessSection page={page} detection={detection} gone={gone} onImported={() => void refreshLocal()} />
 
       {gone && !searchQuery ? null : (
       <div className="nsm-actions">

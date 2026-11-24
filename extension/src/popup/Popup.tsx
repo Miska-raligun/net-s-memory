@@ -1,58 +1,107 @@
 import { useEffect, useState } from "react";
 import { CredibilityCard } from "../ui/CredibilityCard";
 import { sendMessage } from "../lib/messages";
-import { getLlmConfig } from "../lib/storage";
+import { STATE_LABEL } from "../lib/archive/detect";
+import type { WatchEntry } from "../lib/archive/recheck";
 import type { Assessment } from "../lib/types";
 
-type State =
-  | { kind: "loading" }
-  | { kind: "none"; url: string }
-  | { kind: "ready"; assessment: Assessment };
+function fmt(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("zh-CN", { hour12: false });
+}
 
 export function Popup() {
-  const [state, setState] = useState<State>({ kind: "loading" });
-  const [llmConfigured, setLlmConfigured] = useState(false);
+  const [assessment, setAssessment] = useState<Assessment | null>(null);
+  const [watches, setWatches] = useState<WatchEntry[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function loadWatches() {
+    const res = await sendMessage({ type: "LIST_WATCHES" });
+    if (res.ok && "watches" in res) setWatches(res.watches);
+  }
 
   useEffect(() => {
-    (async () => {
-      setLlmConfigured((await getLlmConfig()) !== null);
+    void (async () => {
+      await loadWatches();
+      await sendMessage({ type: "ACK_GONE" }); // opening the popup = seen
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       const url = tab?.url ?? "";
-      if (!url || !/^https?:/.test(url)) {
-        setState({ kind: "none", url });
-        return;
-      }
-      const res = await sendMessage({ type: "GET_CACHED", url });
-      if (res.ok && "assessment" in res && res.assessment) {
-        setState({ kind: "ready", assessment: res.assessment });
-      } else {
-        setState({ kind: "none", url });
+      if (/^https?:/.test(url)) {
+        const res = await sendMessage({ type: "GET_CACHED", url });
+        if (res.ok && "assessment" in res && res.assessment) setAssessment(res.assessment);
       }
     })();
   }, []);
 
+  async function recheckNow() {
+    setBusy(true);
+    setMsg("");
+    try {
+      const res = await sendMessage({ type: "RECHECK_NOW" });
+      if (res.ok && "recheck" in res) {
+        const r = res.recheck;
+        setMsg(
+          `回访 ${r.checked} 条${r.inconclusive ? `，${r.inconclusive} 条无法判断` : ""}` +
+            (r.newly_gone.length ? `，新发现 ${r.newly_gone.length} 条已被删除` : "，没有新的删除"),
+        );
+        await loadWatches();
+      } else if (!res.ok) setMsg(res.error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const gone = watches
+    .filter((w) => w.state !== "live")
+    .sort((a, b) => ((a.gone_since ?? "") < (b.gone_since ?? "") ? 1 : -1));
+  const live = watches.length - gone.length;
+
   return (
-    <div className="nsm-root" style={{ width: 320, padding: 14, background: "var(--bg-surface)" }}>
+    <div className="nsm-root" style={{ width: 340, padding: 14, background: "var(--bg-surface)" }}>
       <div className="nsm-panel-head">
         <span className="nsm-panel-title">互联网记忆</span>
       </div>
 
-      {state.kind === "loading" ? <div className="nsm-muted">加载中…</div> : null}
+      <div className="arc-dim" style={{ marginBottom: 8 }}>
+        监测中 {watches.length} 个链接 · 在线 {live} · 已消失 {gone.length}
+      </div>
 
-      {state.kind === "none" ? (
-        <div className="nsm-muted" style={{ lineHeight: 1.6 }}>
-          当前页面还没有可信度评估。打开一篇新闻正文页，页面右下角会出现可信度徽章；点开徽章即可用你自己的 LLM 评估。
+      {gone.length > 0 ? (
+        <div className="arc" style={{ marginBottom: 10 }}>
+          <div className="arc-section-title">你存过、现在已经消失的内容</div>
+          {gone.slice(0, 8).map((w) => (
+            <div key={w.url} className="arc-version">
+              <a href={w.url} target="_blank" rel="noreferrer" className="arc-mono" style={{ fontSize: 11, wordBreak: "break-all" }}>
+                {w.url}
+              </a>
+              <div className="arc-dim">
+                {STATE_LABEL[w.state]} · 发现于 {fmt(w.gone_since)}
+                {w.evidence ? ` · ${w.evidence}` : ""}
+              </div>
+            </div>
+          ))}
         </div>
       ) : null}
 
-      {state.kind === "ready" ? <CredibilityCard assessment={state.assessment} /> : null}
+      {assessment ? (
+        <details className="arc-cred">
+          <summary>当前页信源参考信号</summary>
+          <CredibilityCard assessment={assessment} />
+        </details>
+      ) : null}
 
+      {msg ? <div className="arc-dim">{msg}</div> : null}
       <div className="nsm-actions">
+        <button className="nsm-btn" onClick={recheckNow} disabled={busy || watches.length === 0}>
+          {busy ? "回访中…" : "立即回访"}
+        </button>
         <button className="nsm-btn" onClick={() => sendMessage({ type: "OPEN_ARCHIVE" })}>
           我的存档
         </button>
         <button className="nsm-btn" onClick={() => chrome.runtime.openOptionsPage()}>
-          设置 {llmConfigured ? "" : "（未配置 LLM key）"}
+          设置
         </button>
       </div>
     </div>

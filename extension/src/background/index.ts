@@ -35,6 +35,19 @@ import {
   refreshCaptureAnchor,
 } from "./archive";
 import { searchElsewhere } from "./search";
+import {
+  ackGone,
+  ensureAlarm,
+  importWitness,
+  onAlarm,
+  publishObservation,
+  queryWitnesses,
+  refreshBadge,
+  reportVisit,
+  runRecheck,
+  watchCapture,
+} from "./witness";
+import { listWatches } from "../lib/storage";
 import { deleteCapture, getCapture, listCaptures } from "../lib/storage";
 
 /** Pull community attestations for a URL from relays and weight them. */
@@ -65,6 +78,7 @@ async function handle(msg: Request, sender: chrome.runtime.MessageSender): Promi
   switch (msg.type) {
     case "CAPTURE": {
       const { capture, warnings } = await captureLocal(msg.input, msg.html, sender.tab?.windowId);
+      await watchCapture(capture);
       return { ok: true, capture, warnings };
     }
     case "CAPTURE_EXTRAS": {
@@ -93,6 +107,29 @@ async function handle(msg: Request, sender: chrome.runtime.MessageSender): Promi
       await chrome.tabs.create({ url: msg.id ? `${base}#${encodeURIComponent(msg.id)}` : base });
       return { ok: true, done: true };
     }
+    case "QUERY_WITNESSES":
+      return { ok: true, witnesses: await queryWitnesses(msg.url) };
+    case "IMPORT_WITNESS":
+      return { ok: true, capture: await importWitness(msg.event_id) };
+    case "REPORT_VISIT":
+      return { ok: true, watch: await reportVisit(msg.url, msg.state, msg.evidence) };
+    case "PUBLISH_OBSERVATION":
+      return {
+        ok: true,
+        published: await publishObservation({
+          url: msg.url,
+          state: msg.state,
+          evidence: msg.evidence,
+          http_status: msg.http_status,
+        }),
+      };
+    case "RECHECK_NOW":
+      return { ok: true, recheck: await runRecheck(true) };
+    case "LIST_WATCHES":
+      return { ok: true, watches: await listWatches() };
+    case "ACK_GONE":
+      await ackGone();
+      return { ok: true, done: true };
     case "SEARCH":
       return { ok: true, search: await searchElsewhere(msg.query, msg.excludeUrl) };
     default:
@@ -196,4 +233,17 @@ chrome.runtime.onMessage.addListener((msg: Request, sender, sendResponse) => {
       sendResponse({ ok: false, error: e instanceof Error ? e.message : String(e) }),
     );
   return true; // keep the channel open for the async response
+});
+
+// Periodic re-checks of archived URLs + the "N deleted" toolbar badge.
+chrome.alarms.onAlarm.addListener((alarm) => {
+  void onAlarm(alarm.name);
+});
+chrome.runtime.onInstalled.addListener(() => {
+  void ensureAlarm();
+  void refreshBadge();
+});
+chrome.runtime.onStartup.addListener(() => {
+  void ensureAlarm();
+  void refreshBadge();
 });

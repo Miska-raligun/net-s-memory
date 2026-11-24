@@ -6,6 +6,9 @@ import type { Capture, CaptureInput } from "./archive/capture";
 import type { CaptureSummary } from "./storage";
 import type { Engine, SearchHit } from "./search/serp";
 import type { Assessment } from "./types";
+import type { PageState } from "./archive/detect";
+import type { WitnessSummary } from "./archive/witness";
+import type { WatchEntry } from "./archive/recheck";
 
 export interface PageInfo {
   url: string;
@@ -28,6 +31,14 @@ export type Request =
   | { type: "PUBLISH_CAPTURE"; id: string }
   | { type: "REFRESH_CAPTURE_ANCHOR"; id: string }
   | { type: "OPEN_ARCHIVE"; id?: string }
+  // --- witnesses & observations (steps 3–4) ---
+  | { type: "QUERY_WITNESSES"; url: string }
+  | { type: "IMPORT_WITNESS"; event_id: string }
+  | { type: "REPORT_VISIT"; url: string; state: PageState; evidence: string | null }
+  | { type: "PUBLISH_OBSERVATION"; url: string; state: PageState; evidence: string | null; http_status: number | null }
+  | { type: "RECHECK_NOW" }
+  | { type: "LIST_WATCHES" }
+  | { type: "ACK_GONE" }
   // --- search (Google / Bing in the user's own browser) ---
   | { type: "SEARCH"; query: string; excludeUrl?: string };
 
@@ -40,6 +51,10 @@ export type Response =
   | { ok: true; captures: CaptureSummary[] }
   | { ok: true; search: SearchOutcome }
   | { ok: true; done: true }
+  | { ok: true; witnesses: WitnessSummary & { relays: number } }
+  | { ok: true; watch: WatchEntry | null }
+  | { ok: true; watches: WatchEntry[] }
+  | { ok: true; recheck: RecheckReport }
   | { ok: false; error: string };
 
 export interface PublishOutcome {
@@ -53,6 +68,12 @@ export interface AnchorOutcome {
   pending: string[];
   bitcoin_height: number | null;
   complete: boolean;
+}
+
+export interface RecheckReport {
+  checked: number;
+  inconclusive: number;
+  newly_gone: string[];
 }
 
 export interface SearchOutcome {

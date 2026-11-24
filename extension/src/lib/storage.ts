@@ -9,6 +9,7 @@ import type { Assessment, LlmConfig } from "./types";
 import type { Capture } from "./archive/capture";
 import type { PageState } from "./archive/detect";
 import type { Engine } from "./search/serp";
+import type { WatchEntry } from "./archive/recheck";
 
 const LLM_KEY = "llm_config";
 const NOSTR_SK_KEY = "nostr_sk";
@@ -118,6 +119,8 @@ export interface ArchiveSettings {
   search_engine: Engine;
   /** Hide mainland-hosted results when searching for corroboration. */
   hide_domestic: boolean;
+  /** Periodically re-fetch archived URLs (no cookies) to notice deletions. */
+  recheck: boolean;
 }
 
 export const DEFAULT_ARCHIVE_SETTINGS: ArchiveSettings = {
@@ -130,6 +133,7 @@ export const DEFAULT_ARCHIVE_SETTINGS: ArchiveSettings = {
   publish_html: false,
   search_engine: "google",
   hide_domestic: true,
+  recheck: true,
 };
 
 const ARCHIVE_SETTINGS_KEY = "archive_settings";
@@ -214,4 +218,33 @@ export async function putLocalBlob(sha256: string, mime: string, b64: string): P
 export async function getLocalBlob(sha256: string): Promise<StoredBlob | null> {
   const out = await chrome.storage.local.get(BLOB_PREFIX + sha256);
   return (out[BLOB_PREFIX + sha256] as StoredBlob | undefined) ?? null;
+}
+
+// --- Watch list: archived URLs and their observed state over time ---------
+
+const WATCH_PREFIX = "watch:";
+const WATCH_INDEX_KEY = "watch_index";
+
+export async function listWatchUrls(): Promise<string[]> {
+  const out = await chrome.storage.local.get(WATCH_INDEX_KEY);
+  return (out[WATCH_INDEX_KEY] as string[] | undefined) ?? [];
+}
+
+export async function getWatch(url: string): Promise<WatchEntry | null> {
+  const out = await chrome.storage.local.get(WATCH_PREFIX + url);
+  return (out[WATCH_PREFIX + url] as WatchEntry | undefined) ?? null;
+}
+
+export async function listWatches(): Promise<WatchEntry[]> {
+  const urls = await listWatchUrls();
+  if (urls.length === 0) return [];
+  const out = await chrome.storage.local.get(urls.map((u) => WATCH_PREFIX + u));
+  return urls.map((u) => out[WATCH_PREFIX + u] as WatchEntry | undefined).filter((w): w is WatchEntry => !!w);
+}
+
+export async function putWatch(w: WatchEntry): Promise<void> {
+  const urls = await listWatchUrls();
+  const patch: Record<string, unknown> = { [WATCH_PREFIX + w.url]: w };
+  if (!urls.includes(w.url)) patch[WATCH_INDEX_KEY] = [...urls, w.url];
+  await chrome.storage.local.set(patch);
 }

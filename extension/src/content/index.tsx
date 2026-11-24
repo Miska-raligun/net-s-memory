@@ -25,6 +25,9 @@ function mount() {
     httpStatus: navigationStatus(),
   });
   const gone = isGone(detection.state);
+  // Tell the worker what this page looks like now; it only records it if the
+  // URL is one we archived before. Local only, no network.
+  void sendMessage({ type: "REPORT_VISIT", url: location.href, state: detection.state, evidence: detection.evidence });
   const extracted = gone ? { title: document.title, text: "" } : extractArticle();
   const articleLike = extracted.text.replace(/\s+/g, "").length >= MIN_ARTICLE_CHARS;
 

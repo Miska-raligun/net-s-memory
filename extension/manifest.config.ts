@@ -35,7 +35,8 @@ export default defineManifest({
     },
   ],
   // unlimitedStorage: captures (text, HTML, screenshots) stay local.
-  permissions: ["storage", "unlimitedStorage", "activeTab"],
+  // alarms: periodic re-check of archived URLs.
+  permissions: ["storage", "unlimitedStorage", "activeTab", "alarms"],
   // <all_urls> is what chrome.tabs.captureVisibleTab requires for the
   // screenshot; it also covers relays, calendars, Blossom and the LLM endpoint.
   host_permissions: ["<all_urls>"],

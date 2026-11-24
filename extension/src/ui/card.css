@@ -207,3 +207,11 @@
 }
 .arc-cred { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
 .arc-cred > summary { cursor: pointer; color: var(--text-muted); font-size: 12px; margin-bottom: 8px; }
+
+/* --- Witnesses ------------------------------------------------------------ */
+.arc-witness { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 2px; }
+.arc-section-title { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+.arc-version { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
+.arc-version-local { border-color: var(--green); }
+.arc-excerpt { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+.nsm-link:disabled { color: var(--text-muted); cursor: default; }

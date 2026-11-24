@@ -49,6 +49,8 @@ export interface Capture {
   ots_b64?: string;
   wayback_url?: string | null;
   published?: PublishRecord[];
+  /** Set when this copy was imported from someone else's witness event. */
+  witness_of?: { pubkey: string; npub: string; event_id: string; created_at: number };
 }
 
 /** What the content script hands to the background worker. */

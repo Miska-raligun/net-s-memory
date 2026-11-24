@@ -86,3 +86,25 @@ export async function uploadToAll(
   }
   return { urls, errors };
 }
+
+/**
+ * Fetch a blob from any of its URLs and return it only if it hashes to the
+ * expected sha256 — a Blossom server (or anyone) cannot substitute content.
+ */
+export async function fetchVerifiedBlob(
+  urls: string[],
+  sha256: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Uint8Array | null> {
+  for (const url of urls) {
+    try {
+      const res = await fetchImpl(url, { credentials: "omit" });
+      if (!res.ok) continue;
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if ((await sha256Hex(bytes)) === sha256) return bytes;
+    } catch {
+      // try the next mirror
+    }
+  }
+  return null;
+}

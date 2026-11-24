@@ -3,7 +3,8 @@ import type { Capture } from "../lib/archive/capture";
 import { STATE_LABEL, isGone } from "../lib/archive/detect";
 import { sha256Hex } from "../lib/canonical";
 import { sendMessage, type AnchorOutcome } from "../lib/messages";
-import { getCapture, getLocalBlob, listCaptures, type CaptureSummary } from "../lib/storage";
+import { getCapture, getLocalBlob, getWatch, listCaptures, listWatches, type CaptureSummary } from "../lib/storage";
+import type { WatchEntry } from "../lib/archive/recheck";
 import { inspect } from "../lib/ots/ots";
 import { describeAnchor } from "../content/ArchivePanel";
 
@@ -42,10 +43,12 @@ function currentId(): string | null {
 
 export function Archive() {
   const [list, setList] = useState<CaptureSummary[]>([]);
+  const [watchMap, setWatchMap] = useState<Map<string, WatchEntry>>(new Map());
   const [id, setId] = useState<string | null>(currentId());
 
   useEffect(() => {
     void listCaptures().then(setList);
+    void listWatches().then((ws) => setWatchMap(new Map(ws.map((w) => [w.url, w]))));
     const onHash = () => setId(currentId());
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -67,6 +70,10 @@ export function Archive() {
             <button key={s.id} className="arch-item" onClick={() => (location.hash = encodeURIComponent(s.id))}>
               <div>
                 {isGone(s.page_state) ? <span className="arch-gone">[{STATE_LABEL[s.page_state]}] </span> : null}
+                {!isGone(s.page_state) && watchMap.get(s.url) && isGone(watchMap.get(s.url)!.state) ? (
+                  <span className="arch-gone">[原文现已{STATE_LABEL[watchMap.get(s.url)!.state]}] </span>
+                ) : null}
+                {s.id.startsWith("w-") ? <span className="arch-imported">[他人见证] </span> : null}
                 {s.title || s.url}
               </div>
               <div className="arch-meta">
@@ -87,12 +94,14 @@ function Detail({ id, onBack, onDeleted }: { id: string; onBack: () => void; onD
   const [shot, setShot] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [watch, setWatch] = useState<WatchEntry | null>(null);
 
   useEffect(() => {
     void (async () => {
       const cap = await getCapture(id);
       if (!cap) return setMissing(true);
       setC(cap);
+      setWatch(await getWatch(cap.url));
       setHashOk((await sha256Hex(cap.text)) === cap.text_sha256);
       const shotRef = cap.blobs.find((b) => b.kind === "screenshot");
       if (shotRef) {
@@ -144,6 +153,18 @@ function Detail({ id, onBack, onDeleted }: { id: string; onBack: () => void; onD
         <div className="arch-kv">
           <span>原链接</span><span><a href={c.original_url} target="_blank" rel="noreferrer">{c.url}</a></span>
           <span>存档时间</span><span>{fmt(c.captured_at)}</span>
+          {c.witness_of ? (
+            <>
+              <span>来源</span>
+              <span>他人见证的副本 · {c.witness_of.npub.slice(0, 20)}… · 事件 {c.witness_of.event_id.slice(0, 12)}…（导入时已重新验签并核对哈希）</span>
+            </>
+          ) : null}
+          <span>原文当前状态</span>
+          <span>
+            {watch
+              ? `${STATE_LABEL[watch.state]}${watch.gone_since ? `（发现于 ${fmt(watch.gone_since)}）` : ""} · 已回访 ${watch.checks} 次${watch.next_check_at ? ` · 下次 ${fmt(watch.next_check_at)}` : ""}`
+              : "未监测"}
+          </span>
           <span>存档时状态</span><span>{STATE_LABEL[c.page_state]}{c.page_evidence ? `（${c.page_evidence}）` : ""}</span>
           <span>正文 SHA-256</span>
           <span className="arc-mono">
@@ -157,7 +178,9 @@ function Detail({ id, onBack, onDeleted }: { id: string; onBack: () => void; onD
           <span>{c.published?.length ? c.published.map((p) => `${fmt(p.at)} · ${p.relays_ok} 个中继 · ${p.event_id.slice(0, 12)}…`).join("\n") : "未发布"}</span>
         </div>
         <div className="nsm-actions">
-          <button className="nsm-btn nsm-btn-primary" disabled={busy} onClick={() => act("PUBLISH_CAPTURE")}>发布见证（Nostr）</button>
+          {c.witness_of ? null : (
+            <button className="nsm-btn nsm-btn-primary" disabled={busy} onClick={() => act("PUBLISH_CAPTURE")}>发布见证（Nostr）</button>
+          )}
           <button className="nsm-btn" disabled={busy} onClick={() => act("REFRESH_CAPTURE_ANCHOR")}>{anchor ? "刷新时间戳" : "锚定到比特币"}</button>
           <button className="nsm-btn" onClick={() => download(`${c.id}.json`, JSON.stringify(c, null, 2), "application/json")}>导出 JSON</button>
           <button className="nsm-btn" disabled={!c.ots_b64} onClick={() => download(`${c.id}.txt.ots`, b64ToBytes(c.ots_b64!) as BlobPart, "application/octet-stream")}>下载 .ots</button>

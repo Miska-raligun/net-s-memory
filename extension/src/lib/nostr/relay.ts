@@ -85,3 +85,32 @@ export async function publishEvent(
     pool.close(relays);
   }
 }
+
+/** All events of the given kinds that reference a URL via an "r" tag. */
+export async function queryByUrl(
+  relays: string[],
+  url: string,
+  kinds: number[],
+  timeoutMs = 6000,
+): Promise<Event[]> {
+  const pool = new SimplePool();
+  try {
+    return await withTimeout(pool.querySync(relays, { kinds, "#r": [url], limit: 500 }), timeoutMs, []);
+  } catch {
+    return [];
+  } finally {
+    pool.close(relays);
+  }
+}
+
+/** Fetch one event by id (used to re-verify before importing). */
+export async function queryById(relays: string[], id: string, timeoutMs = 6000): Promise<Event | null> {
+  const pool = new SimplePool();
+  try {
+    return await withTimeout(pool.get(relays, { ids: [id] }), timeoutMs, null);
+  } catch {
+    return null;
+  } finally {
+    pool.close(relays);
+  }
+}

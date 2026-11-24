@@ -22,3 +22,4 @@
 .arch-bad { color: var(--red); }
 .arch .nsm-actions { flex-wrap: wrap; }
 .arch .nsm-btn { flex: none; }
+.arch-imported { color: var(--amber); }
