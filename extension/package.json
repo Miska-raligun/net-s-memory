@@ -1,6 +1,6 @@
 {
   "name": "nsm-credibility-extension",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Decentralized source-credibility browser extension for 互联网记忆 (net-s-memory). No self-hosted backend: client-side LLM assessment + Nostr P2P attestations.",
   "type": "module",

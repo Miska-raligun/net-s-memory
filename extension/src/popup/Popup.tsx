@@ -4,6 +4,7 @@ import { sendMessage } from "../lib/messages";
 import { STATE_LABEL } from "../lib/archive/detect";
 import type { WatchEntry } from "../lib/archive/recheck";
 import type { Assessment } from "../lib/types";
+import type { UpdateInfo } from "../lib/update";
 
 function fmt(iso: string | null): string {
   if (!iso) return "—";
@@ -16,6 +17,31 @@ export function Popup() {
   const [watches, setWatches] = useState<WatchEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [updateMsg, setUpdateMsg] = useState("");
+
+  async function checkUpdate(force: boolean) {
+    setChecking(force);
+    setUpdateMsg("");
+    try {
+      const res = await sendMessage({ type: "CHECK_UPDATE", force });
+      if (res.ok && "update" in res) {
+        setUpdate(res.update);
+        if (force && res.update) {
+          setUpdateMsg(
+            res.update.error
+              ? res.update.error
+              : res.update.available
+                ? ""
+                : `已是最新版本（v${res.update.current}）`,
+          );
+        }
+      }
+    } finally {
+      setChecking(false);
+    }
+  }
 
   async function loadWatches() {
     const res = await sendMessage({ type: "LIST_WATCHES" });
@@ -26,6 +52,7 @@ export function Popup() {
     void (async () => {
       await loadWatches();
       await sendMessage({ type: "ACK_GONE" }); // opening the popup = seen
+      void checkUpdate(false); // cheap: only hits the network if a day has passed
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       const url = tab?.url ?? "";
       if (/^https?:/.test(url)) {
@@ -63,6 +90,48 @@ export function Popup() {
       <div className="nsm-panel-head">
         <span className="nsm-panel-title">互联网记忆</span>
       </div>
+
+      {update?.available ? (
+        <div className="arc-update">
+          <div className="arc-update-title">
+            有新版本 v{update.latest}（当前 v{update.current}）
+          </div>
+          <ol className="arc-update-steps">
+            <li>
+              下载{" "}
+              {update.zip_url ? (
+                <a href={update.zip_url} target="_blank" rel="noreferrer">
+                  安装包
+                </a>
+              ) : null}
+              {update.release_url ? (
+                <>
+                  {" · "}
+                  <a href={update.release_url} target="_blank" rel="noreferrer">
+                    发布说明
+                  </a>
+                </>
+              ) : null}
+            </li>
+            <li>解压，覆盖到当初加载扩展的那个文件夹</li>
+            <li>
+              在{" "}
+              <button
+                className="nsm-link"
+                onClick={() => chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}` })}
+              >
+                扩展管理页
+              </button>{" "}
+              点「重新加载」（本机存档会保留）
+            </li>
+          </ol>
+          {update.zip_sha256 ? (
+            <div className="arc-dim arc-mono" style={{ wordBreak: "break-all" }}>
+              SHA-256 {update.zip_sha256}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="arc-dim" style={{ marginBottom: 8 }}>
         监测中 {watches.length} 个链接 · 在线 {live} · 已消失 {gone.length}
@@ -104,6 +173,13 @@ export function Popup() {
           设置
         </button>
       </div>
+      <div className="arc-row arc-dim" style={{ marginTop: 10 }}>
+        <span>v{chrome.runtime.getManifest().version}</span>
+        <button className="nsm-link" onClick={() => checkUpdate(true)} disabled={checking}>
+          {checking ? "检查中…" : "检查更新"}
+        </button>
+      </div>
+      {updateMsg ? <div className="arc-dim">{updateMsg}</div> : null}
     </div>
   );
 }

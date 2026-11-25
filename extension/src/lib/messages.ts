@@ -10,6 +10,7 @@ import type { PageState } from "./archive/detect";
 import type { WitnessSummary } from "./archive/witness";
 import type { WatchEntry } from "./archive/recheck";
 import type { TrustEntry } from "./trustlist";
+import type { UpdateInfo } from "./update";
 
 export interface PageInfo {
   url: string;
@@ -45,6 +46,8 @@ export type Request =
   | { type: "TRUST_ADD"; input: string; label: string }
   | { type: "TRUST_REMOVE"; pubkey: string }
   | { type: "TRUST_IMPORT"; input: string }
+  // --- update check ---
+  | { type: "CHECK_UPDATE"; force: boolean }
   // --- search (Google / Bing in the user's own browser) ---
   | { type: "SEARCH"; query: string; excludeUrl?: string };
 
@@ -59,6 +62,7 @@ export type Response =
   | { ok: true; done: true }
   | { ok: true; witnesses: WitnessView }
   | { ok: true; trust: TrustEntry[]; added?: number; found?: number }
+  | { ok: true; update: UpdateInfo | null }
   | { ok: true; watch: WatchEntry | null }
   | { ok: true; watches: WatchEntry[] }
   | { ok: true; recheck: RecheckReport }

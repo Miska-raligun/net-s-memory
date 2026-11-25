@@ -27,6 +27,7 @@ import { sha256Hex } from "../lib/canonical";
 import { identityFromSk, createIdentity } from "../lib/nostr/keys";
 import { publishEvent, queryById, queryByUrl } from "../lib/nostr/relay";
 import { getTrustContext } from "./trust";
+import { runUpdateCheck, storedUpdate } from "./update";
 import { normalizeUrl } from "../lib/url";
 import {
   getArchiveSettings,
@@ -49,11 +50,18 @@ function nowIso(): string {
 
 // ---- toolbar badge --------------------------------------------------------
 
+/** Badge: newly vanished archives (red count) take priority over "update available" (blue ↑). */
 export async function refreshBadge(): Promise<number> {
   const n = (await listWatches()).filter((w) => w.unseen_gone).length;
-  await chrome.action.setBadgeBackgroundColor({ color: "#e5534b" });
-  await chrome.action.setBadgeText({ text: n > 0 ? String(n) : "" });
-  return n;
+  if (n > 0) {
+    await chrome.action.setBadgeBackgroundColor({ color: "#e5534b" });
+    await chrome.action.setBadgeText({ text: String(n) });
+    return n;
+  }
+  const u = await storedUpdate();
+  await chrome.action.setBadgeBackgroundColor({ color: "#2f6feb" });
+  await chrome.action.setBadgeText({ text: u?.available ? "↑" : "" });
+  return 0;
 }
 
 export async function ackGone(): Promise<void> {
@@ -256,6 +264,7 @@ export async function ensureAlarm(): Promise<void> {
 
 export async function onAlarm(name: string): Promise<void> {
   if (name !== RECHECK_ALARM) return;
-  if (!(await getArchiveSettings()).recheck) return;
-  await runRecheck(false);
+  await runUpdateCheck(false).catch(() => null); // no-op unless a day has passed
+  if ((await getArchiveSettings()).recheck) await runRecheck(false);
+  await refreshBadge();
 }

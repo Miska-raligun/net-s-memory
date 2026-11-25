@@ -111,6 +111,9 @@ ots verify <id>.txt.ots     # 证明这段正文在对应比特币区块之前�
 `net-s-memory-extension-vX.Y.Z.zip`（可用同名 `.sha256` 文件校验），解压到一个固定的文件夹。
 然后打开 `chrome://extensions`，开启「开发者模式」，点「加载已解压的扩展程序」，选择解压出的文件夹。
 
+已安装的扩展每天会检查一次新版本：有新版本时图标显示「↑」，点开弹窗按三步说明升级即可
+（解压覆盖到原文件夹，然后点「重新加载」）。
+
 发新版本是全自动的：在 PR 里修改 `extension/package.json` 的 `version`（例如改成 `0.3.0`），合并进 main 即可。
 `.github/workflows/release-extension.yml` 发现 `v0.3.0` 还没有发布，就会自动跑测试、构建、创建标签和 Release，
 并附上 zip 和 `.sha256`。已经发布过的版本号不会重复发布。另外也支持推送 `vX.Y.Z` 标签、

@@ -220,3 +220,8 @@
 .arc-who { font-size: 11px; color: var(--text-dim); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; display: inline-flex; gap: 5px; align-items: center; }
 .arc-who-trusted { border-color: var(--green); color: var(--green); }
 .arc-trust-btn { font-size: 11px; }
+
+.arc-update { border: 1px solid #2f6feb; background: rgba(47, 111, 235, 0.12); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; font-size: 12px; }
+.arc-update-title { font-weight: 700; color: #79a6ff; margin-bottom: 4px; }
+.arc-update-steps { margin: 4px 0 6px; padding-left: 18px; line-height: 1.7; color: var(--text-dim); }
+.arc-update a { color: #58a6ff; }

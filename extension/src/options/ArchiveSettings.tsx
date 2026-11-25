@@ -18,6 +18,7 @@ const TOGGLES: { key: BoolKey; label: string; hint: string }[] = [
   { key: "publish_screenshot", label: "发布见证时上传截图", hint: "截图可能包含你的登录头像/昵称，默认关闭。" },
   { key: "publish_html", label: "发布见证时上传 HTML", hint: "登录状态下的 HTML 常含你的账号信息，默认关闭。" },
   { key: "recheck", label: "定期回访我存过的链接", hint: "后台不带 cookie 地重新打开存过的链接（1 小时、6 小时、1 天…最长 3 个月），发现被删就在图标上提示。微博、知乎等需要登录渲染的平台只在你亲自访问时判断。" },
+  { key: "check_updates", label: "每天检查一次新版本", hint: "向 GitHub 查询最新发布版本（不带 cookie），有新版本时在图标上显示 ↑。只提示，不会自动下载或安装。" },
   { key: "hide_domestic", label: "查找其他报道时隐藏境内来源", hint: "只显示境外站点的报道，作为不受同一删帖压力影响的独立印证。" },
 ];
 
