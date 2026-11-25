@@ -96,3 +96,7 @@
   border: 1px solid var(--border); border-radius: 8px; color: var(--text);
   font-size: 13px; font-family: var(--font-mono);
 }
+
+.nsm-trust-list { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.nsm-trust-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+.nsm-trust-actions { display: flex; gap: 6px; flex: none; }

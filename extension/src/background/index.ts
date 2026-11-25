@@ -21,7 +21,7 @@ import {
   urlAddress,
   type ParsedAttestation,
 } from "../lib/nostr/attestation";
-import { publishEvent, queryAttestations, queryFollows } from "../lib/nostr/relay";
+import { publishEvent, queryAttestations } from "../lib/nostr/relay";
 import { computeCommunitySignal } from "../lib/nostr/trust";
 import { inspect, stamp, upgrade } from "../lib/ots/ots";
 import type { CommunitySignal } from "../lib/types";
@@ -47,7 +47,8 @@ import {
   runRecheck,
   watchCapture,
 } from "./witness";
-import { listWatches } from "../lib/storage";
+import { getTrustList, listWatches } from "../lib/storage";
+import { addTrust, dropTrust, getTrustContext, importFollowsOf } from "./trust";
 import { deleteCapture, getCapture, listCaptures } from "../lib/storage";
 
 /** Pull community attestations for a URL from relays and weight them. */
@@ -60,15 +61,8 @@ async function fetchCommunitySignal(normalizedUrl: string): Promise<CommunitySig
       .map(parseAttestation)
       .filter((p): p is ParsedAttestation => p !== null);
 
-    const sk = await getNostrSk();
-    let selfPubkey: string | null = null;
-    let follows = new Set<string>();
-    if (sk) {
-      const id = identityFromSk(sk);
-      selfPubkey = id.pubkey;
-      follows = await queryFollows(relays, id.pubkey);
-    }
-    return computeCommunitySignal(parsed, follows, selfPubkey);
+    const who = await getTrustContext(relays);
+    return computeCommunitySignal(parsed, who.trusted, who.self);
   } catch {
     return { count: 0, weighted_score: null };
   }
@@ -130,6 +124,16 @@ async function handle(msg: Request, sender: chrome.runtime.MessageSender): Promi
     case "ACK_GONE":
       await ackGone();
       return { ok: true, done: true };
+    case "TRUST_LIST":
+      return { ok: true, trust: await getTrustList() };
+    case "TRUST_ADD":
+      return { ok: true, trust: await addTrust(msg.input, msg.label) };
+    case "TRUST_REMOVE":
+      return { ok: true, trust: await dropTrust(msg.pubkey) };
+    case "TRUST_IMPORT": {
+      const r = await importFollowsOf(msg.input);
+      return { ok: true, trust: r.list, added: r.added, found: r.found };
+    }
     case "SEARCH":
       return { ok: true, search: await searchElsewhere(msg.query, msg.excludeUrl) };
     default:

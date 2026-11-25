@@ -11,7 +11,7 @@ import {
   type ObservationMethod,
   type ParsedObservation,
 } from "../lib/archive/observation";
-import { aggregateWitnesses, type WitnessSummary } from "../lib/archive/witness";
+import { aggregateWitnesses } from "../lib/archive/witness";
 import {
   applyObservation,
   dueEntries,
@@ -25,7 +25,8 @@ import { isGone, platformOf, type PageState, type Platform } from "../lib/archiv
 import { normalizeText } from "../lib/archive/normalize";
 import { sha256Hex } from "../lib/canonical";
 import { identityFromSk, createIdentity } from "../lib/nostr/keys";
-import { publishEvent, queryById, queryByUrl, queryFollows } from "../lib/nostr/relay";
+import { publishEvent, queryById, queryByUrl } from "../lib/nostr/relay";
+import { getTrustContext } from "./trust";
 import { normalizeUrl } from "../lib/url";
 import {
   getArchiveSettings,
@@ -38,7 +39,7 @@ import {
   putWatch,
   setNostrSk,
 } from "../lib/storage";
-import type { PublishOutcome } from "../lib/messages";
+import type { PublishOutcome, WitnessView } from "../lib/messages";
 
 const RECHECK_BATCH = 10;
 
@@ -126,19 +127,12 @@ export async function runRecheck(all = false, fetchImpl: typeof fetch = fetch): 
 
 // ---- witnesses from relays --------------------------------------------------
 
-async function selfAndFollows(relays: string[]): Promise<{ self: string | null; follows: Set<string> }> {
-  const sk = await getNostrSk();
-  if (!sk) return { self: null, follows: new Set() };
-  const self = identityFromSk(sk).pubkey;
-  return { self, follows: await queryFollows(relays, self) };
-}
-
-export async function queryWitnesses(rawUrl: string): Promise<WitnessSummary & { relays: number }> {
+export async function queryWitnesses(rawUrl: string): Promise<WitnessView> {
   const url = normalizeUrl(rawUrl);
   const relays = await getRelays();
   const [events, who, local] = await Promise.all([
     queryByUrl(relays, url, [CAPTURE_KIND, OBSERVATION_KIND]),
-    selfAndFollows(relays),
+    getTrustContext(relays),
     listCaptures(url),
   ]);
   const captures: ParsedCapture[] = [];
@@ -156,11 +150,15 @@ export async function queryWitnesses(rawUrl: string): Promise<WitnessSummary & {
     }
   }
   const summary = aggregateWitnesses(captures, observations, {
-    follows: who.follows,
+    follows: who.trusted,
     self: who.self,
     localHashes: new Set(local.map((c) => c.text_sha256)),
   });
-  return { ...summary, relays: relays.length };
+  const shown = new Set([...summary.versions.flatMap((v) => v.witnesses), ...(summary.gone?.observers ?? [])]);
+  const trusted_keys = [...shown].filter((k) => who.trusted.has(k));
+  const labels: Record<string, string> = {};
+  for (const k of shown) if (who.labels[k]) labels[k] = who.labels[k];
+  return { ...summary, relays: relays.length, trusted_keys, labels, self: who.self };
 }
 
 /** Re-fetch the event by id, re-verify it, and keep it as a local copy. */

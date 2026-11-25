@@ -11,6 +11,7 @@ import {
 import { createIdentity, identityFromSk, importNsec, nsecOf } from "../lib/nostr/keys";
 import type { LlmConfig } from "../lib/types";
 import { ArchiveSettings } from "./ArchiveSettings";
+import { TrustSettings } from "./TrustSettings";
 
 interface Preset {
   name: string;
@@ -166,8 +167,9 @@ export function Options() {
 
       <h1 style={{ marginTop: 32 }}>Nostr 身份与中继</h1>
       <div className="sub">
-        去中心化协同层：你的可信度背书会用下面这把 Nostr 密钥签名后发布到公共中继，
-        别人客户端验签后按「关注网络」加权计入分数。无需任何自建服务器。
+        你发布的存档见证和删除观察，都会用下面这把 Nostr 密钥签名后发到公共中继。
+        npub 是公开的身份 ID；nsec 是私钥，只存在本机，泄露等于身份被盗。
+        建议使用一把和真实身份无关的专用密钥（首次发布时自动生成的就是）。
       </div>
 
       <div className="nsm-field">
@@ -222,6 +224,8 @@ export function Options() {
       {nostrStatus ? <div className="nsm-status">{nostrStatus}</div> : null}
 
       <ArchiveSettings />
+
+      <TrustSettings />
 
       <div className="nsm-note">
         所有密钥仅保存在浏览器本地（chrome.storage.local），不上传、不同步。
