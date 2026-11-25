@@ -12,6 +12,7 @@ import type { Engine } from "./search/serp";
 import type { WatchEntry } from "./archive/recheck";
 import type { TrustEntry } from "./trustlist";
 import type { UpdateInfo } from "./update";
+import type { Relation } from "./archive/judgment";
 
 const LLM_KEY = "llm_config";
 const NOSTR_SK_KEY = "nostr_sk";
@@ -288,4 +289,22 @@ export async function setUpdateInfo(u: UpdateInfo): Promise<void> {
 export async function getUpdateApiUrl(): Promise<string | null> {
   const out = await chrome.storage.local.get(UPDATE_API_KEY);
   return (out[UPDATE_API_KEY] as string | undefined) ?? null;
+}
+
+// --- Evidence collected for judging one text version -----------------------
+
+export interface EvidenceItem {
+  capture_id: string;
+  relation: Relation;
+}
+
+const EVIDENCE_PREFIX = "evid:";
+
+export async function getEvidence(targetSha: string): Promise<EvidenceItem[]> {
+  const out = await chrome.storage.local.get(EVIDENCE_PREFIX + targetSha);
+  return (out[EVIDENCE_PREFIX + targetSha] as EvidenceItem[] | undefined) ?? [];
+}
+
+export async function setEvidence(targetSha: string, items: EvidenceItem[]): Promise<void> {
+  await chrome.storage.local.set({ [EVIDENCE_PREFIX + targetSha]: items });
 }

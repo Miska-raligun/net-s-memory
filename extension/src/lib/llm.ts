@@ -75,7 +75,7 @@ function extractJson(text: string): unknown {
   }
 }
 
-async function callOpenAi(config: LlmConfig, input: LlmCheckInput): Promise<string> {
+async function callOpenAi(config: LlmConfig, system: string, user: string, maxTokens = 400): Promise<string> {
   const url = config.base_url.replace(/\/$/, "") + "/chat/completions";
   const res = await fetch(url, {
     method: "POST",
@@ -86,11 +86,11 @@ async function callOpenAi(config: LlmConfig, input: LlmCheckInput): Promise<stri
     body: JSON.stringify({
       model: config.model,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: buildUserPrompt(input) },
+        { role: "system", content: system },
+        { role: "user", content: user },
       ],
       temperature: 0.2,
-      max_tokens: 400,
+      max_tokens: maxTokens,
       response_format: { type: "json_object" },
     }),
   });
@@ -103,7 +103,7 @@ async function callOpenAi(config: LlmConfig, input: LlmCheckInput): Promise<stri
   return content;
 }
 
-async function callAnthropic(config: LlmConfig, input: LlmCheckInput): Promise<string> {
+async function callAnthropic(config: LlmConfig, system: string, user: string, maxTokens = 400): Promise<string> {
   const url = config.base_url.replace(/\/$/, "") + "/v1/messages";
   const res = await fetch(url, {
     method: "POST",
@@ -116,9 +116,9 @@ async function callAnthropic(config: LlmConfig, input: LlmCheckInput): Promise<s
     },
     body: JSON.stringify({
       model: config.model,
-      max_tokens: 400,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: buildUserPrompt(input) }],
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: "user", content: user }],
     }),
   });
   if (!res.ok) {
@@ -136,7 +136,40 @@ export async function runLlmCheck(
 ): Promise<LlmCheckResult> {
   const raw =
     config.provider === "anthropic"
-      ? await callAnthropic(config, input)
-      : await callOpenAi(config, input);
+      ? await callAnthropic(config, SYSTEM_PROMPT, buildUserPrompt(input))
+      : await callOpenAi(config, SYSTEM_PROMPT, buildUserPrompt(input));
   return coerceResult(extractJson(raw));
+}
+
+// --- Verification checklist (assistant only; never counted as a judgment) ---
+
+const CHECKLIST_PROMPT =
+  "你是事实核查助手。不要判断真假，只把文章里可以被核实的具体事实断言列出来（谁、何时、何地、数字、引语、因果），" +
+  "并为每条给出一个具体的核实途径（例如：查某机构的公告、对照另一家独立媒体的报道、查原始文件）。最多 8 条，按重要性排序。" +
+  '只输出 JSON：{"claims": [{"claim": "<不超过60字>", "how_to_verify": "<不超过60字>"}]}。';
+
+export interface ChecklistItem {
+  claim: string;
+  how_to_verify: string;
+}
+
+export async function runClaimChecklist(
+  config: LlmConfig,
+  input: { title: string; text: string },
+): Promise<ChecklistItem[]> {
+  const user = `标题：${input.title}\n正文（可能被截断）：\n${input.text.slice(0, MAX_LLM_TEXT_CHARS)}`;
+  const raw =
+    config.provider === "anthropic"
+      ? await callAnthropic(config, CHECKLIST_PROMPT, user, 900)
+      : await callOpenAi(config, CHECKLIST_PROMPT, user, 900);
+  const parsed = extractJson(raw) as { claims?: unknown };
+  if (!Array.isArray(parsed?.claims)) throw new LlmError("LLM 没有返回要点列表");
+  return parsed.claims
+    .filter((c): c is Record<string, unknown> => typeof c === "object" && c !== null)
+    .map((c) => ({
+      claim: String(c.claim ?? "").slice(0, 120),
+      how_to_verify: String(c.how_to_verify ?? "").slice(0, 120),
+    }))
+    .filter((c) => c.claim)
+    .slice(0, 8);
 }

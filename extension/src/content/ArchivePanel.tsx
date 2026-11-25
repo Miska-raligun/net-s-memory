@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { STATE_LABEL, isGone, type Detection } from "../lib/archive/detect";
 import type { Capture } from "../lib/archive/capture";
 import { WitnessSection } from "./WitnessSection";
+import { JudgmentSection } from "./JudgmentSection";
 import { sendMessage, type AnchorOutcome, type PageInfo, type Response, type SearchOutcome } from "../lib/messages";
 import type { CaptureSummary } from "../lib/storage";
 
@@ -27,6 +28,10 @@ export function describeAnchor(a: AnchorOutcome): string {
 export function ArchivePanel({ page, detection, capture, onArchived }: Props) {
   const gone = isGone(detection.state);
   const [local, setLocal] = useState<CaptureSummary[]>([]);
+  const [evidenceTick, setEvidenceTick] = useState(0);
+  const [savingHit, setSavingHit] = useState<string | null>(null);
+  const [savedHits, setSavedHits] = useState<Set<string>>(new Set());
+  const [hitErr, setHitErr] = useState("");
   const [current, setCurrent] = useState<Capture | null>(null);
   const [busy, setBusy] = useState<"" | "capture" | "extras" | "publish" | "search">("");
   const [notes, setNotes] = useState<string[]>([]);
@@ -34,6 +39,24 @@ export function ArchivePanel({ page, detection, capture, onArchived }: Props) {
   const [publishMsg, setPublishMsg] = useState("");
   const [search, setSearch] = useState<SearchOutcome | null>(null);
   const [searchErr, setSearchErr] = useState("");
+
+  // The text version being judged: the most recent copy you hold of this page.
+  const target = local[0] ?? null;
+
+  async function saveAsEvidence(url: string) {
+    if (!target) return;
+    setSavingHit(url);
+    setHitErr("");
+    try {
+      const res = await sendMessage({ type: "OPEN_AND_CAPTURE", url, target: target.text_sha256 });
+      if (res.ok && "capture" in res) {
+        setSavedHits((s) => new Set(s).add(url));
+        setEvidenceTick((t) => t + 1);
+      } else if (!res.ok) setHitErr(res.error);
+    } finally {
+      setSavingHit(null);
+    }
+  }
 
   async function refreshLocal() {
     const res = await sendMessage({ type: "LIST_CAPTURES", url: page.url });
@@ -190,6 +213,15 @@ export function ArchivePanel({ page, detection, capture, onArchived }: Props) {
 
       <WitnessSection page={page} detection={detection} gone={gone} onImported={() => void refreshLocal()} />
 
+      {target ? (
+        <JudgmentSection
+          url={page.url}
+          target={target}
+          evidenceTick={evidenceTick}
+          onEvidenceChanged={() => setEvidenceTick((t) => t + 1)}
+        />
+      ) : null}
+
       {gone && !searchQuery ? null : (
       <div className="nsm-actions">
         <button className="nsm-btn" onClick={onSearch} disabled={busy !== "" || !searchQuery}>
@@ -201,7 +233,7 @@ export function ArchivePanel({ page, detection, capture, onArchived }: Props) {
       {search ? (
         <div className="arc-hits">
           <div className="arc-dim">
-            {search.engine === "google" ? "Google" : "必应国际版"} · {search.hits.length} 条
+            <span className="arc-tag">线索，未经核实</span> {search.engine === "google" ? "Google" : "必应国际版"} · {search.hits.length} 条
             {search.hidden_domestic ? ` · 已隐藏 ${search.hidden_domestic} 条境内来源` : ""} ·{" "}
             <a href={search.search_url} target="_blank" rel="noreferrer">
               打开搜索页
@@ -212,12 +244,26 @@ export function ArchivePanel({ page, detection, capture, onArchived }: Props) {
               <a href={h.url} target="_blank" rel="noreferrer">
                 {h.title}
               </a>
-              <div className="arc-dim">
-                {h.domain}
-                {h.domestic ? <span className="arc-tag">境内</span> : null}
+              <div className="arc-dim arc-row">
+                <span>
+                  {h.domain}
+                  {h.domestic ? <span className="arc-tag">境内</span> : null}
+                </span>
+                {target ? (
+                  <button
+                    className="nsm-link"
+                    disabled={savingHit !== null || savedHits.has(h.url)}
+                    onClick={() => saveAsEvidence(h.url)}
+                    title="打开这条结果，存档后加入证据，供真实性判断引用"
+                  >
+                    {savedHits.has(h.url) ? "已存为证据" : savingHit === h.url ? "存档中…" : "存为证据"}
+                  </button>
+                ) : null}
               </div>
             </div>
           ))}
+          {!target ? <div className="arc-dim">先存档本页，才能把搜索结果存为证据。</div> : null}
+          {hitErr ? <div className="arc-warn">{hitErr}</div> : null}
         </div>
       ) : null}
     </div>
