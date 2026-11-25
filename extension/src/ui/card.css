@@ -215,3 +215,8 @@
 .arc-version-local { border-color: var(--green); }
 .arc-excerpt { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
 .nsm-link:disabled { color: var(--text-muted); cursor: default; }
+
+.arc-witnesses { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.arc-who { font-size: 11px; color: var(--text-dim); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; display: inline-flex; gap: 5px; align-items: center; }
+.arc-who-trusted { border-color: var(--green); color: var(--green); }
+.arc-trust-btn { font-size: 11px; }

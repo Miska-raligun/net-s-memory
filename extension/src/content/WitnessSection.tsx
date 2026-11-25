@@ -6,8 +6,8 @@
 
 import { useState } from "react";
 import { STATE_LABEL, type Detection } from "../lib/archive/detect";
-import type { WitnessSummary } from "../lib/archive/witness";
-import { sendMessage, type PageInfo } from "../lib/messages";
+import { sendMessage, type PageInfo, type WitnessView } from "../lib/messages";
+import { shortNpub } from "../lib/trustlist";
 
 interface Props {
   page: PageInfo;
@@ -22,8 +22,8 @@ function fmt(iso: string): string {
 }
 
 export function WitnessSection({ page, detection, gone, onImported }: Props) {
-  const [summary, setSummary] = useState<(WitnessSummary & { relays: number }) | null>(null);
-  const [busy, setBusy] = useState<"" | "query" | "import" | "observe">("");
+  const [summary, setSummary] = useState<WitnessView | null>(null);
+  const [busy, setBusy] = useState<"" | "query" | "import" | "observe" | "trust">("");
   const [msg, setMsg] = useState("");
   const [imported, setImported] = useState<Set<string>>(new Set());
 
@@ -52,6 +52,27 @@ export function WitnessSection({ page, detection, gone, onImported }: Props) {
     } finally {
       setBusy("");
     }
+  }
+
+  async function trust(pubkey: string) {
+    const label = window.prompt(`给这位见证人写个备注（只保存在你本机，可留空）\n${shortNpub(pubkey)}`, "");
+    if (label === null) return; // cancelled
+    setBusy("trust");
+    setMsg("");
+    try {
+      const res = await sendMessage({ type: "TRUST_ADD", input: pubkey, label });
+      if (res.ok && "trust" in res) {
+        setMsg("已加入你的信任列表（只保存在本机，不会公开）");
+        await query();
+      } else if (!res.ok) setMsg(res.error);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function who(pubkey: string): string {
+    if (summary?.self === pubkey) return "你";
+    return summary?.labels[pubkey] || shortNpub(pubkey);
   }
 
   async function observe() {
@@ -95,7 +116,7 @@ export function WitnessSection({ page, detection, gone, onImported }: Props) {
             <div className="arc-warn">
               {summary.gone.observers.length} 人报告
               {summary.gone.states.map((s) => STATE_LABEL[s]).join(" / ")}
-              {summary.gone.trusted ? `（其中 ${summary.gone.trusted} 人是你关注的）` : ""} · 最早 {fmt(summary.gone.earliest)}
+              {summary.gone.trusted ? `（其中 ${summary.gone.trusted} 人是你信任的）` : ""} · 最早 {fmt(summary.gone.earliest)}
             </div>
           ) : null}
           {summary.versions.length === 0 ? (
@@ -111,7 +132,7 @@ export function WitnessSection({ page, detection, gone, onImported }: Props) {
               <div className="arc-row">
                 <span className="arc-mono">{v.text_sha256.slice(0, 12)}…</span>
                 <span>
-                  {v.witnesses.length} 人见证{v.trusted ? ` · ${v.trusted} 人你关注` : ""}
+                  {v.witnesses.length} 人见证{v.trusted ? ` · ${v.trusted} 人你信任` : ""}
                 </span>
               </div>
               <div className="arc-dim">
@@ -128,6 +149,23 @@ export function WitnessSection({ page, detection, gone, onImported }: Props) {
                   </>
                 ) : null}
               </div>
+              <div className="arc-witnesses">
+                {v.witnesses.slice(0, 8).map((k) => {
+                  const trusted = summary.trusted_keys.includes(k);
+                  return (
+                    <span key={k} className={`arc-who${trusted ? " arc-who-trusted" : ""}`} title={k}>
+                      {trusted ? "✓ " : ""}
+                      {who(k)}
+                      {!trusted && k !== summary.self ? (
+                        <button className="nsm-link arc-trust-btn" disabled={busy !== ""} onClick={() => trust(k)}>
+                          信任
+                        </button>
+                      ) : null}
+                    </span>
+                  );
+                })}
+                {v.witnesses.length > 8 ? <span className="arc-dim">等 {v.witnesses.length} 人</span> : null}
+              </div>
               {v.best.content.text ? <div className="arc-excerpt">{v.best.content.text.slice(0, 120)}…</div> : null}
               {!v.matches_local && v.has_text ? (
                 <button
@@ -140,7 +178,7 @@ export function WitnessSection({ page, detection, gone, onImported }: Props) {
               ) : null}
             </div>
           ))}
-          <div className="arc-dim">人数是不同密钥的数量，密钥可以随意生成。更可信的是你关注的人，以及与你自己副本一致的版本。</div>
+          <div className="arc-dim">人数是不同密钥的数量，密钥可以随意生成。更可信的是你信任的人（✓），以及与你自己副本一致的版本。信任列表在「设置」里管理，只保存在本机。</div>
         </>
       )}
       {msg ? <div className="arc-dim">{msg}</div> : null}

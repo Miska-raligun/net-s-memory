@@ -10,6 +10,7 @@ import type { Capture } from "./archive/capture";
 import type { PageState } from "./archive/detect";
 import type { Engine } from "./search/serp";
 import type { WatchEntry } from "./archive/recheck";
+import type { TrustEntry } from "./trustlist";
 
 const LLM_KEY = "llm_config";
 const NOSTR_SK_KEY = "nostr_sk";
@@ -121,6 +122,8 @@ export interface ArchiveSettings {
   hide_domestic: boolean;
   /** Periodically re-fetch archived URLs (no cookies) to notice deletions. */
   recheck: boolean;
+  /** Also treat the public NIP-02 follow list of your own key as trusted. */
+  use_public_follows: boolean;
 }
 
 export const DEFAULT_ARCHIVE_SETTINGS: ArchiveSettings = {
@@ -134,6 +137,7 @@ export const DEFAULT_ARCHIVE_SETTINGS: ArchiveSettings = {
   search_engine: "google",
   hide_domestic: true,
   recheck: true,
+  use_public_follows: true,
 };
 
 const ARCHIVE_SETTINGS_KEY = "archive_settings";
@@ -247,4 +251,17 @@ export async function putWatch(w: WatchEntry): Promise<void> {
   const patch: Record<string, unknown> = { [WATCH_PREFIX + w.url]: w };
   if (!urls.includes(w.url)) patch[WATCH_INDEX_KEY] = [...urls, w.url];
   await chrome.storage.local.set(patch);
+}
+
+// --- Local trust list (never published) ------------------------------------
+
+const TRUST_KEY = "trust_list";
+
+export async function getTrustList(): Promise<TrustEntry[]> {
+  const out = await chrome.storage.local.get(TRUST_KEY);
+  return (out[TRUST_KEY] as TrustEntry[] | undefined) ?? [];
+}
+
+export async function setTrustList(list: TrustEntry[]): Promise<void> {
+  await chrome.storage.local.set({ [TRUST_KEY]: list });
 }

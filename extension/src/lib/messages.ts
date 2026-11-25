@@ -9,6 +9,7 @@ import type { Assessment } from "./types";
 import type { PageState } from "./archive/detect";
 import type { WitnessSummary } from "./archive/witness";
 import type { WatchEntry } from "./archive/recheck";
+import type { TrustEntry } from "./trustlist";
 
 export interface PageInfo {
   url: string;
@@ -39,6 +40,11 @@ export type Request =
   | { type: "RECHECK_NOW" }
   | { type: "LIST_WATCHES" }
   | { type: "ACK_GONE" }
+  // --- local trust list ---
+  | { type: "TRUST_LIST" }
+  | { type: "TRUST_ADD"; input: string; label: string }
+  | { type: "TRUST_REMOVE"; pubkey: string }
+  | { type: "TRUST_IMPORT"; input: string }
   // --- search (Google / Bing in the user's own browser) ---
   | { type: "SEARCH"; query: string; excludeUrl?: string };
 
@@ -51,7 +57,8 @@ export type Response =
   | { ok: true; captures: CaptureSummary[] }
   | { ok: true; search: SearchOutcome }
   | { ok: true; done: true }
-  | { ok: true; witnesses: WitnessSummary & { relays: number } }
+  | { ok: true; witnesses: WitnessView }
+  | { ok: true; trust: TrustEntry[]; added?: number; found?: number }
   | { ok: true; watch: WatchEntry | null }
   | { ok: true; watches: WatchEntry[] }
   | { ok: true; recheck: RecheckReport }
@@ -68,6 +75,15 @@ export interface AnchorOutcome {
   pending: string[];
   bitcoin_height: number | null;
   complete: boolean;
+}
+
+export interface WitnessView extends WitnessSummary {
+  relays: number;
+  /** Trusted keys among the witnesses/observers shown (not the whole list). */
+  trusted_keys: string[];
+  /** Your notes for trusted keys that appear here. */
+  labels: Record<string, string>;
+  self: string | null;
 }
 
 export interface RecheckReport {
