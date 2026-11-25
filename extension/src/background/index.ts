@@ -50,6 +50,16 @@ import {
 import { getTrustList, listWatches } from "../lib/storage";
 import { addTrust, dropTrust, getTrustContext, importFollowsOf } from "./trust";
 import { runUpdateCheck } from "./update";
+import {
+  addEvidence,
+  claimChecklist,
+  evidenceReport,
+  fetchEvidence,
+  openAndCapture,
+  publishJudgment,
+  queryJudgments,
+  updateEvidence,
+} from "./judgment";
 import { deleteCapture, getCapture, listCaptures } from "../lib/storage";
 
 /** Pull community attestations for a URL from relays and weight them. */
@@ -135,6 +145,32 @@ async function handle(msg: Request, sender: chrome.runtime.MessageSender): Promi
       const r = await importFollowsOf(msg.input);
       return { ok: true, trust: r.list, added: r.added, found: r.found };
     }
+    case "OPEN_AND_CAPTURE":
+      return { ok: true, capture: await openAndCapture(msg.url, msg.target, sender.tab?.id) };
+    case "EVIDENCE_REPORT":
+      return { ok: true, evidence: await evidenceReport(msg.target) };
+    case "EVIDENCE_ADD":
+      await addEvidence(msg.target, msg.capture_id);
+      return { ok: true, evidence: await evidenceReport(msg.target) };
+    case "EVIDENCE_UPDATE":
+      await updateEvidence(msg.target, msg.capture_id, msg.relation);
+      return { ok: true, evidence: await evidenceReport(msg.target) };
+    case "FETCH_EVIDENCE":
+      return { ok: true, capture: await fetchEvidence(msg.text_sha256) };
+    case "QUERY_JUDGMENTS":
+      return { ok: true, judgments: await queryJudgments(msg.text_sha256) };
+    case "PUBLISH_JUDGMENT":
+      return {
+        ok: true,
+        judged: await publishJudgment({
+          url: msg.url,
+          text_sha256: msg.text_sha256,
+          verdict: msg.verdict,
+          reason: msg.reason,
+        }),
+      };
+    case "CLAIM_CHECKLIST":
+      return { ok: true, checklist: await claimChecklist(msg.text_sha256) };
     case "CHECK_UPDATE": {
       const update = await runUpdateCheck(msg.force);
       await refreshBadge();

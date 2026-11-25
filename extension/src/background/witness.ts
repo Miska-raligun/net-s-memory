@@ -24,21 +24,20 @@ import { fetchVerifiedBlob } from "../lib/archive/blossom";
 import { isGone, platformOf, type PageState, type Platform } from "../lib/archive/detect";
 import { normalizeText } from "../lib/archive/normalize";
 import { sha256Hex } from "../lib/canonical";
-import { identityFromSk, createIdentity } from "../lib/nostr/keys";
+import { identityFromSk } from "../lib/nostr/keys";
 import { publishEvent, queryById, queryByUrl } from "../lib/nostr/relay";
 import { getTrustContext } from "./trust";
+import { ensureSk } from "./archive";
 import { runUpdateCheck, storedUpdate } from "./update";
 import { normalizeUrl } from "../lib/url";
 import {
   getArchiveSettings,
-  getNostrSk,
   getRelays,
   getWatch,
   listCaptures,
   listWatches,
   putCapture,
   putWatch,
-  setNostrSk,
 } from "../lib/storage";
 import type { PublishOutcome, WitnessView } from "../lib/messages";
 
@@ -216,14 +215,6 @@ export async function importWitness(eventId: string): Promise<Capture> {
 
 // ---- publishing observations ---------------------------------------------------
 
-async function ensureSk(): Promise<string> {
-  let sk = await getNostrSk();
-  if (!sk) {
-    sk = createIdentity().skHex;
-    await setNostrSk(sk);
-  }
-  return sk;
-}
 
 export async function publishObservation(input: {
   url: string;

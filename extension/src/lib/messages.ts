@@ -11,6 +11,9 @@ import type { WitnessSummary } from "./archive/witness";
 import type { WatchEntry } from "./archive/recheck";
 import type { TrustEntry } from "./trustlist";
 import type { UpdateInfo } from "./update";
+import type { Relation, Verdict } from "./archive/judgment";
+import type { EvidenceReport, JudgmentView } from "../background/judgment";
+import type { ChecklistItem } from "./llm";
 
 export interface PageInfo {
   url: string;
@@ -46,6 +49,15 @@ export type Request =
   | { type: "TRUST_ADD"; input: string; label: string }
   | { type: "TRUST_REMOVE"; pubkey: string }
   | { type: "TRUST_IMPORT"; input: string }
+  // --- truthfulness judgments ---
+  | { type: "OPEN_AND_CAPTURE"; url: string; target: string }
+  | { type: "EVIDENCE_REPORT"; target: string }
+  | { type: "EVIDENCE_ADD"; target: string; capture_id: string }
+  | { type: "EVIDENCE_UPDATE"; target: string; capture_id: string; relation: Relation | null }
+  | { type: "FETCH_EVIDENCE"; text_sha256: string }
+  | { type: "QUERY_JUDGMENTS"; text_sha256: string }
+  | { type: "PUBLISH_JUDGMENT"; url: string; text_sha256: string; verdict: Verdict; reason: string }
+  | { type: "CLAIM_CHECKLIST"; text_sha256: string }
   // --- update check ---
   | { type: "CHECK_UPDATE"; force: boolean }
   // --- search (Google / Bing in the user's own browser) ---
@@ -63,6 +75,10 @@ export type Response =
   | { ok: true; witnesses: WitnessView }
   | { ok: true; trust: TrustEntry[]; added?: number; found?: number }
   | { ok: true; update: UpdateInfo | null }
+  | { ok: true; evidence: EvidenceReport }
+  | { ok: true; judgments: JudgmentView }
+  | { ok: true; judged: { published: PublishOutcome; witnessed: number; evidence: number } }
+  | { ok: true; checklist: ChecklistItem[] }
   | { ok: true; watch: WatchEntry | null }
   | { ok: true; watches: WatchEntry[] }
   | { ok: true; recheck: RecheckReport }

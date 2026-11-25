@@ -124,7 +124,8 @@ export async function refreshCaptureAnchor(id: string): Promise<{ capture: Captu
   return { capture, anchor: anchorOf(capture.ots_b64) };
 }
 
-async function ensureSk(): Promise<string> {
+/** The user's Nostr key, created on first publish (same behaviour everywhere). */
+export async function ensureSk(): Promise<string> {
   let sk = await getNostrSk();
   if (!sk) {
     sk = createIdentity().skHex;

@@ -13,6 +13,51 @@ function nextFrame(): Promise<void> {
   return new Promise((r) => requestAnimationFrame(() => r()));
 }
 
+/** Archive this page now (used for 存档本页 and for "存为证据" from another tab). */
+async function captureNow(): Promise<Response> {
+  const detection = detectPageState({
+    url: location.href,
+    title: document.title,
+    bodyText: bodyText(),
+    httpStatus: navigationStatus(),
+  });
+  const fresh = extractArticle();
+  if (detection.state === "live" && fresh.text.replace(/\s+/g, "").length < 50) {
+    return { ok: false, error: "这个页面几乎没有正文，无法作为证据存档" };
+  }
+  const host = document.getElementById(HOST_ID);
+  if (host) host.style.visibility = "hidden"; // keep the widget out of the screenshot
+  await nextFrame();
+  await nextFrame();
+  try {
+    return await sendMessage({
+      type: "CAPTURE",
+      input: {
+        url: location.href,
+        title: fresh.title,
+        text: fresh.text,
+        page_state: detection.state,
+        page_evidence: detection.evidence,
+        platform: detection.platform,
+      },
+      html: snapshotHtml(HOST_ID),
+    });
+  } finally {
+    if (host) host.style.visibility = "";
+  }
+}
+
+// The worker opens a search result and asks this tab to archive itself.
+if (window.top === window.self) {
+  chrome.runtime.onMessage.addListener((msg: { type?: string }, _sender, sendResponse) => {
+    if (msg?.type !== "AUTO_CAPTURE") return false;
+    void captureNow().then(sendResponse, (e: unknown) =>
+      sendResponse({ ok: false, error: e instanceof Error ? e.message : String(e) }),
+    );
+    return true;
+  });
+}
+
 function mount() {
   // Only the top frame, only once.
   if (window.top !== window.self) return;
@@ -48,33 +93,9 @@ function mount() {
   const mountPoint = document.createElement("div");
   shadow.appendChild(mountPoint);
 
-  async function capture(): Promise<Response> {
-    // Re-extract at click time: the page may have lazy-loaded more content.
-    const fresh = extractArticle();
-    host.style.visibility = "hidden"; // keep the widget out of the screenshot
-    await nextFrame();
-    await nextFrame();
-    try {
-      return await sendMessage({
-        type: "CAPTURE",
-        input: {
-          url: location.href,
-          title: fresh.title,
-          text: fresh.text,
-          page_state: detection.state,
-          page_evidence: detection.evidence,
-          platform: detection.platform,
-        },
-        html: snapshotHtml(HOST_ID),
-      });
-    } finally {
-      host.style.visibility = "";
-    }
-  }
-
   createRoot(mountPoint).render(
     <StrictMode>
-      <Widget page={page} detection={detection} articleLike={articleLike} capture={capture} />
+      <Widget page={page} detection={detection} articleLike={articleLike} capture={captureNow} />
     </StrictMode>,
   );
 }
