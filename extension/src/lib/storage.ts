@@ -11,6 +11,7 @@ import type { PageState } from "./archive/detect";
 import type { Engine } from "./search/serp";
 import type { WatchEntry } from "./archive/recheck";
 import type { TrustEntry } from "./trustlist";
+import type { UpdateInfo } from "./update";
 
 const LLM_KEY = "llm_config";
 const NOSTR_SK_KEY = "nostr_sk";
@@ -124,6 +125,8 @@ export interface ArchiveSettings {
   recheck: boolean;
   /** Also treat the public NIP-02 follow list of your own key as trusted. */
   use_public_follows: boolean;
+  /** Ask GitHub Releases once a day whether a newer version exists. */
+  check_updates: boolean;
 }
 
 export const DEFAULT_ARCHIVE_SETTINGS: ArchiveSettings = {
@@ -138,6 +141,7 @@ export const DEFAULT_ARCHIVE_SETTINGS: ArchiveSettings = {
   hide_domestic: true,
   recheck: true,
   use_public_follows: true,
+  check_updates: true,
 };
 
 const ARCHIVE_SETTINGS_KEY = "archive_settings";
@@ -264,4 +268,24 @@ export async function getTrustList(): Promise<TrustEntry[]> {
 
 export async function setTrustList(list: TrustEntry[]): Promise<void> {
   await chrome.storage.local.set({ [TRUST_KEY]: list });
+}
+
+// --- Update check -----------------------------------------------------------
+
+const UPDATE_KEY = "update_info";
+/** Optional override of the releases API (forks, tests). */
+const UPDATE_API_KEY = "update_api_url";
+
+export async function getUpdateInfo(): Promise<UpdateInfo | null> {
+  const out = await chrome.storage.local.get(UPDATE_KEY);
+  return (out[UPDATE_KEY] as UpdateInfo | undefined) ?? null;
+}
+
+export async function setUpdateInfo(u: UpdateInfo): Promise<void> {
+  await chrome.storage.local.set({ [UPDATE_KEY]: u });
+}
+
+export async function getUpdateApiUrl(): Promise<string | null> {
+  const out = await chrome.storage.local.get(UPDATE_API_KEY);
+  return (out[UPDATE_API_KEY] as string | undefined) ?? null;
 }

@@ -49,6 +49,7 @@ import {
 } from "./witness";
 import { getTrustList, listWatches } from "../lib/storage";
 import { addTrust, dropTrust, getTrustContext, importFollowsOf } from "./trust";
+import { runUpdateCheck } from "./update";
 import { deleteCapture, getCapture, listCaptures } from "../lib/storage";
 
 /** Pull community attestations for a URL from relays and weight them. */
@@ -133,6 +134,11 @@ async function handle(msg: Request, sender: chrome.runtime.MessageSender): Promi
     case "TRUST_IMPORT": {
       const r = await importFollowsOf(msg.input);
       return { ok: true, trust: r.list, added: r.added, found: r.found };
+    }
+    case "CHECK_UPDATE": {
+      const update = await runUpdateCheck(msg.force);
+      await refreshBadge();
+      return { ok: true, update };
     }
     case "SEARCH":
       return { ok: true, search: await searchElsewhere(msg.query, msg.excludeUrl) };
@@ -243,11 +249,12 @@ chrome.runtime.onMessage.addListener((msg: Request, sender, sendResponse) => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   void onAlarm(alarm.name);
 });
-chrome.runtime.onInstalled.addListener(() => {
+function boot(): void {
   void ensureAlarm();
-  void refreshBadge();
-});
-chrome.runtime.onStartup.addListener(() => {
-  void ensureAlarm();
-  void refreshBadge();
-});
+  // After an upgrade the stored "update available" flag re-evaluates itself.
+  void runUpdateCheck(false)
+    .catch(() => null)
+    .then(() => refreshBadge());
+}
+chrome.runtime.onInstalled.addListener(boot);
+chrome.runtime.onStartup.addListener(boot);
